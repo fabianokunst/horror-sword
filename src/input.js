@@ -43,6 +43,7 @@ export class Input {
     document.addEventListener('pointerlockerror', () => (this.freeLook = true));
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === el;
+      if (this.locked) this.freeLook = false; // a later lock worked: back to normal mouse look
       this.onLockChange?.(this.locked);
     });
   }

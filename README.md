@@ -10,6 +10,12 @@ npm run dev      # http://localhost:5173
 npm run build    # gera dist/
 ```
 
+O jogo precisa do build: abrir o `index.html` da raiz direto (ou servir a raiz do repositório) não funciona, porque ele aponta para `src/` e importa `three` do `node_modules`.
+
+### Publicar (GitHub Pages)
+
+Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que faz o build e publica o `dist/` em https://fabianokunst.github.io/horror-sword/. O `vite.config.js` usa `base: './'`, então o build funciona em qualquer subcaminho. Em **Settings → Pages → Build and deployment → Source** precisa estar **GitHub Actions** (com "Deploy from a branch" o Pages serve o código-fonte cru: tela sem CSS e jogo parado).
+
 ## Controles
 
 | Tecla | Ação |

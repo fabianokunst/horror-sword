@@ -276,6 +276,9 @@ retro.apply(settings.values);
 
 function resize() {
   const w = innerWidth, h = innerHeight;
+  // a page loaded hidden or before layout (background tab, iframe, webview) reports 0×0;
+  // keep the last size instead of allocating zero-size render targets, the next resize fixes it
+  if (!w || !h) return;
   renderer.setSize(w, h);
   retro.setSize(w, h);
   camera.aspect = w / h;
@@ -495,8 +498,9 @@ function frame() {
       if (key) choosePerk(key);
     }
     if (state === 'inv') {
-      // Esc (or switching to mouse) drops the pointer lock: close the inventory and fall into the pause menu
-      const lost = !input.touch && !input.locked;
+      // Esc (or switching to mouse) drops the pointer lock: close the inventory and fall into the pause menu.
+      // In freeLook the lock was refused (re-lock too soon after Esc, iframes), so there is nothing to lose.
+      const lost = !input.touch && !input.locked && !input.freeLook;
       if (lost || !inv.handle(input)) {
         inv.close();
         state = 'play';
