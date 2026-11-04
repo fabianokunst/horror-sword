@@ -8,7 +8,7 @@ const el = (tag, props = {}, parent) => {
   parent?.append(n);
   return n;
 };
-const DOT = { ghoul: '#9cff40', vampire: '#ff3050', bat: '#c040ff', bride: '#ff60c0', wolf: '#ffa030', dracula: '#ff0000' };
+const DOT = { ghoul: '#9cff40', vampire: '#ff3050', bat: '#c040ff', bride: '#ff60c0', wolf: '#ffa030', dracula: '#ff0000', witch: '#60ff90' };
 const RANGE = 70;
 
 export class Hud {

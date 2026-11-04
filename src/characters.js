@@ -463,6 +463,40 @@ function buildWolf() {
   return R.build();
 }
 
+// the Count's witch: hooded and hunched, keeps her distance and hexes with a lantern staff
+function buildWitch() {
+  const C = { skin: 0xa8b890, robe: 0x2a3a24, robeDk: 0x18241a, hood: 0x3a2a40, hair: 0xc8c8c0, wood: 0x5a3a1c, glow: 0x60ff90, bone: 0xe0d8b8 };
+  const R = new Rig();
+  humanBones(R, { arm: 1.1 });
+  humanBody(R, { skin: C.skin, top: C.robe, pants: C.robe, sleeve: C.robe, cuff: C.robeDk, collar: C.hood }, { legsHidden: true, arm: 1.1, w: 0.95 });
+  // ragged robe down to the ground
+  R.add(tube([
+    { p: [0, 1.1, 0], r: [0.18, 0.12], c: C.robe }, { p: [0, 0.8, 0], r: [0.26, 0.2], c: C.robe },
+    { p: [0, 0.35, -0.02], r: [0.34, 0.28], c: C.robeDk }, { p: [0, 0.03, -0.03], r: [0.4, 0.34], c: C.robeDk },
+  ], { segs: 14 }), ['spine', 'hips', 'legL', 'legR']);
+  // pointed hood, open at the face
+  R.add(tube([
+    { p: [0, 1.6, -0.02], r: [0.17, 0.14], c: C.hood }, { p: [0, 1.86, -0.03], r: [0.155, 0.155], c: C.hood },
+    { p: [0, 2.0, -0.09], r: [0.08, 0.08], c: C.hood }, { p: [0, 2.07, -0.18], r: [0.01, 0.01], c: C.hood },
+  ], { arc: [Math.PI / 2 + 0.75, Math.PI * 2.5 - 0.75], segs: 12 }), ['chest', 'neck', 'head']);
+  R.add(tube([{ p: [0, 1.58, 0], r: [0.2, 0.15], c: C.hood }, { p: [0, 1.46, 0], r: [0.24, 0.17], c: C.hood }], { segs: 12 }), ['chest']);
+  // face: green eyes, hooked nose, grey hair hanging out of the hood
+  eyes(R, C.glow, true, 1.81, 0.04, 0.02);
+  R.add(spike([0, 1.79, 0.11], [0, 1.745, 0.19], 0.026, C.skin, 5), 'head');
+  R.add(ellipsoid([0, 1.83, -0.02], [0.11, 0.11, 0.12], C.hair, { theta: Math.PI * 0.55, rx: -0.4 }), 'head');
+  for (const sx of [1, -1]) R.add(tube([{ p: [0.09 * sx, 1.8, 0.03], r: 0.026, c: C.hair }, { p: [0.12 * sx, 1.45, 0.07], r: 0.012, c: C.hair }]), ['head', 'neck', 'chest']);
+  for (const sx of [1, -1]) for (let i = -1; i <= 1; i++)
+    R.add(spike([0.285 * sx + i * 0.018, 0.79, 0.03], [0.29 * sx + i * 0.02, 0.73, 0.05], 0.008, C.bone, 4), sx > 0 ? 'handL' : 'handR');
+  // gnarled staff with a green lantern, held in the left hand
+  R.prop('handL', (g) => {
+    cyl(g, 0.022, 0.03, 1.9, 5, C.wood, 0.3, 1.0, 0.06);
+    box(g, 0.05, 0.16, 0.05, C.wood, 0.3, 1.98, 0.06, { rz: 0.4 });
+    box(g, 0.13, 0.15, 0.13, C.glow, 0.3, 2.08, 0.06, { glow: 2.4 });
+    box(g, 0.16, 0.03, 0.16, 0x1a1a1a, 0.3, 2.17, 0.06);
+  });
+  return R.build();
+}
+
 function buildBat() {
   const R = new Rig(0);
   R.bone('body', null, [0, 0, -0.12], [0, 0, 0.2]);
@@ -497,6 +531,7 @@ const BUILDERS = {
   ghoul: buildGhoul,
   wolf: buildWolf,
   bat: buildBat,
+  witch: buildWitch,
 };
 
 const templates = new Map();

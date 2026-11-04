@@ -8,7 +8,7 @@ import { sfx } from './audio.js';
 const SLOTS = 8, COLS = 4, ROWS = SLOTS / COLS;
 const START = ['herbG', 'water'];
 const ACTIONS = [['use', 'USAR'], ['startCombine', 'COMBINAR'], ['examine', 'EXAMINAR'], ['drop', 'DESCARTAR']];
-const LOOT = { ghoul: 0.12, vampire: 0.18, bat: 0.05, bride: 0.35, wolf: 0.22 };
+const LOOT = { ghoul: 0.12, vampire: 0.18, bat: 0.05, bride: 0.35, wolf: 0.22, witch: 0.3 };
 const BLESS_MAX = 90;
 const PV = 96; // preview render size, upscaled with chunky pixels
 const ICON_POSE = { sword: [0, 0.3, -0.8], crossbow: [0.5, 0.9, 0] };

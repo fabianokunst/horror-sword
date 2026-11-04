@@ -282,6 +282,13 @@ const CREATURE = {
     attack: (o, t) => voice(o, t, [150, 190, 130], 0.4, 0.9, 'o', { rough: 0.55 }),
     idle: (o, t) => voice(o, t, [95, 110, 90], 1.2, 0.6, 'o', { v2: 'u', rough: 0.6, a: 0.3 }),
   },
+  witch: {
+    die: (o, t) => voice(o, t, [620, 900, 300], 1.2, 0.6, 'i', { v2: 'a', vib: 0.04, rough: 0.2, shift: 1.15 }),
+    // a muttered curse rising into a hiss
+    attack: (o, t) => { voice(o, t, [260, 300, 240, 340], 0.45, 0.6, 'e', { v2: 'i', rough: 0.3, shift: 1.1 }); hiss(o, t + 0.3, 0.3, 0.25); },
+    // cracked, high cackle: "he-he-he"
+    idle: (o, t) => { for (let i = 0; i < 4; i++) voice(o, t + i * 0.13, [520 - i * 20, 430 - i * 20], 0.1, 0.5, 'e', { shift: 1.2, rough: 0.25, a: 0.01 }); },
+  },
   dracula: {
     die: (o, t) => {
       voice(o, t, [170, 120, 42], 3, 1, 'a', { v2: 'o', rough: 0.35, shift: 0.8 });
@@ -492,6 +499,18 @@ const S = {
     creature('dracula').idle(out(pos, 0.4), t + 0.3);
     const o = out(null, 0.6);
     for (const m of [38, 50, 53, 57, 62]) organ(o, t + 0.1, hz(m), 1.4, 0.035);
+  },
+  // the bride's scream: a piercing wail with a shock of noise (stuns the hunter close by)
+  scream(t, pos) {
+    const o = out(pos, 0.5);
+    voice(o, t, [900, 1400, 1250, 800], 1.1, 0.8, 'i', { v2: 'a', vib: 0.05, shift: 1.3, a: 0.04 });
+    noise(o, t, 'bandpass', 3000, 1200, 0.5, 0.4, 1.5, 0.01);
+  },
+  // the witch's hex: a glassy sparkle around a soft whoosh
+  hexShot(t, pos) {
+    const o = out(pos, 0.4);
+    noise(o, t, 'bandpass', 900, 2600, 0.3, 0.35, 2, 0.02);
+    for (let i = 0; i < 4; i++) osc(o, t + i * 0.04, 'sine', hz(88 + i * 3), hz(88 + i * 3), 0.25, 0.05, 0.002);
   },
   // blood orbs leaving the Count's hand: a wet, rising whoosh
   bloodShot(t, pos) {

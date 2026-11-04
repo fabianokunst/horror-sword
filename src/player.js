@@ -52,12 +52,21 @@ export class Player {
     this.phase = 0;
     this.flash = 0;
     this.counter = 0; // seconds left of the counter window opened by a perfect dodge
+    this.stun = 0; // seconds left stunned (see stagger)
     this.onSwing = null;
     this.light = new THREE.PointLight(0x70d8ff, 2.2, 12, 1);
     scene.add(this.light);
   }
 
-  get busy() { return this.dead || !!this.roll; }
+  get busy() { return this.dead || !!this.roll || this.stun > 0; }
+
+  // stunned (a bride's scream): no moving, striking or dodging for a moment
+  stagger(t) {
+    if (this.dead) return;
+    this.stun = Math.max(this.stun, t);
+    this.attack = null;
+    this.queued = false;
+  }
 
   // New stats from levels/perks; a higher max HP is granted immediately, not as an empty bar.
   applyStats(stats) {
@@ -88,6 +97,7 @@ export class Player {
     this.deadT = 0;
     this.flash = 0;
     this.counter = 0;
+    this.stun = 0;
     if (this.m.spin) this.m.spin.rotation.set(0, 0, 0);
   }
 
@@ -155,6 +165,7 @@ export class Player {
     this.invuln = Math.max(0, this.invuln - dt);
     this.shootCd = Math.max(0, this.shootCd - dt);
     this.counter = Math.max(0, this.counter - dt);
+    this.stun = Math.max(0, this.stun - dt);
     if (this.bolts < s.maxBolts && (this.boltTimer += dt) > s.boltReload) { this.bolts++; this.boltTimer = 0; }
 
     let tx = 0, tz = 0;
@@ -171,7 +182,11 @@ export class Player {
       this.facing = Math.atan2(r.dx, r.dz);
       m.spin.rotation.x = p * Math.PI * 2;
       if (p >= 1) { this.roll = null; m.spin.rotation.x = 0; }
+    } else if (this.stun > 0) {
+      // stunned: reel in place
+      m.spin.rotation.z = Math.sin(time * 22) * 0.12 * Math.min(1, this.stun * 3);
     } else {
+      m.spin.rotation.z = 0;
       const sprint = mv.sprint && moveLen > 0 && this.stamina > 1 && !this.swimming && !this.attack;
       let speed = (this.swimming ? 3 : sprint ? 10.5 : 6.5) * s.speedMul;
       if (this.attack) speed = 1.5;

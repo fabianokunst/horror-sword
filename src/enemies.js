@@ -8,9 +8,13 @@ import { NavGrid } from './nav.js';
 
 export const TYPES = {
   ghoul: { model: () => 'ghoul', hp: 3, speed: 3.6, dmg: 10, range: 1.5, windup: 0.4, blood: 0x7cff3a, souls: 1, radius: 0.5 },
-  vampire: { model: () => 'vampire' + Math.floor(Math.random() * 3), hp: 4, speed: 5.4, dmg: 14, range: 1.6, windup: 0.32, blood: 0xd0102a, souls: 2, blink: 7, burns: true, radius: 0.45 },
+  // lunge: a telegraphed dash from mid range
+  vampire: { model: () => 'vampire' + Math.floor(Math.random() * 3), hp: 4, speed: 5.4, dmg: 14, range: 1.6, windup: 0.32, blood: 0xd0102a, souls: 2, blink: 7, lunge: true, burns: true, radius: 0.45 },
   bat: { model: () => 'bat', hp: 1, speed: 8.5, dmg: 6, range: 1.3, windup: 0.12, blood: 0xb020d0, souls: 1, fly: 2.4, radius: 0.4, scale: 1.4, center: 0 },
-  bride: { model: () => 'bride' + Math.floor(Math.random() * 3), hp: 5, speed: 7.5, dmg: 15, range: 1.8, windup: 0.3, blood: 0xff2a6a, souls: 3, fly: 3.6, burns: true, radius: 0.5, center: 1 },
+  // scream: stuns a hunter close by who doesn't dodge it
+  bride: { model: () => 'bride' + Math.floor(Math.random() * 3), hp: 5, speed: 7.5, dmg: 15, range: 1.8, windup: 0.3, blood: 0xff2a6a, souls: 3, fly: 3.6, scream: true, burns: true, radius: 0.5, center: 1 },
+  // ranged: keeps 8-13 m away, hexes with homing green orbs and flees when the hunter closes in
+  witch: { model: () => 'witch', hp: 4, speed: 4.6, dmg: 12, range: 1.4, windup: 0.45, blood: 0x60ff90, souls: 2, ranged: true, burns: true, radius: 0.45 },
   wolf: { model: () => 'wolf', hp: 6, speed: 8, dmg: 16, range: 1.9, windup: 0.32, blood: 0xc01818, souls: 3, leap: true, radius: 0.6, scale: 1.2 },
   dracula: { model: () => 'dracula', hp: 45, speed: 5.8, dmg: 24, range: 2.6, windup: 0.42, blood: 0xff1030, souls: 15, blink: 3.5, burns: true, boss: true, radius: 0.8, scale: 1.4, name: 'CONDE DRÁCULA' },
 };
@@ -39,6 +43,9 @@ const SHOT_GEO = new THREE.OctahedronGeometry(0.22, 0);
 const SHOT_MAT = basic(0xff1a30, 2.2);
 const SHOT_SPEED = 13;
 const SHOT_DMG = 0.6; // of his strike damage
+const HEX_MAT = basic(0x60ff90, 2.2);
+const LUNGE = { prep: 0.42, dur: 0.32, speed: 19 }; // vampire dash
+const SCREAM = { prep: 0.55, radius: 6.5, stun: 0.7, dmg: 0.4 }; // bride scream
 
 // roaming creatures when no campaign chapter is driving the spawns
 const DEFAULT_SPAWN = { max: 8, interval: 2.6, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul', 'wolf'] };
@@ -76,6 +83,8 @@ export class Enemies {
     this.clock = 0;
     this.nav = null; // ground navigation around the hunter (nav.js), built on the first update
     this.flowDir = { x: 0, z: 0 };
+    this.tmpV = new THREE.Vector3();
+    this.onStagger = null;
   }
 
   // Scales a fresh creature to the current chapter; some come back as glowing elites.
@@ -136,6 +145,9 @@ export class Enemies {
       stun: 0, flash: 0, dying: 0, blinkCd: 2 + Math.random() * 4, leapCd: 2, leap: null, crouch: 0,
       burn: 0, speedMul: 0.85 + Math.random() * 0.3, tell: 0, side: Math.random() < 0.5 ? 1 : -1,
       navT: Math.random() * 0.15, hidden: false, pathing: false, // line-of-sight check timer / result
+      // special moves: cast (boss orbs, witch hex), prep (vampire lunge / bride scream windup), dash
+      cast: 0, castCd: 2 + Math.random() * 2, prep: 0, prepKind: '', dash: null,
+      lungeCd: 2 + Math.random() * 3, screamCd: 3 + Math.random() * 3,
     };
     // the eye glint, parented to the head (bats: the body) so it follows the animation
     e.glint = glowSprite(0xff3a1a, 1, 0.95);
@@ -168,7 +180,7 @@ export class Enemies {
       e.speedMul *= 1.3;
       e.windup = 0.36;
       e.blinkBase = 2.2;
-      const aura = glowSprite(0xff1030, 3.4, 0.55);
+      const aura = glowSprite(0xff1030, 2.2, 0.5);
       aura.position.y = 1.3;
       e.m.root.add(aura);
       this.spawn('bride', e.pos.x, e.pos.z, 6, 12);
@@ -188,7 +200,7 @@ export class Enemies {
       mesh.add(glowSprite(0xff2030, 1.6, 0.7));
       mesh.position.copy(from);
       this.scene.add(mesh);
-      this.shots.push({ mesh, vel: new THREE.Vector3(Math.sin(a), rise, Math.cos(a)).normalize().multiplyScalar(SHOT_SPEED), life: 3, owner: e, hit: false });
+      this.shots.push({ mesh, vel: new THREE.Vector3(Math.sin(a), rise, Math.cos(a)).normalize().multiplyScalar(SHOT_SPEED), life: 3, owner: e, hit: false, dmgMul: SHOT_DMG, homing: 0, color: 0xff1030 });
     }
     sfx.bloodShot(from);
   }
@@ -209,7 +221,8 @@ export class Enemies {
     e.kx = dirX * k;
     e.kz = dirZ * k;
     e.atk = -1;
-    e.crouch = 0; // a hit interrupts a werewolf about to pounce
+    e.crouch = 0; // a hit interrupts a werewolf about to pounce...
+    if (!e.T.boss) { e.prep = 0; e.cast = 0; e.dash = null; } // ...a lunge, a scream or a hex
     const p = e.pos.clone().setY(centerY(e));
     this.fx.burst(p, e.T.blood, 14, { speed: 5, up: 4 });
     this.fx.burst(p, 0xffffff, 3, { speed: 7, up: 2, life: 0.2, size: 0.08 });
@@ -280,14 +293,43 @@ export class Enemies {
 
   // A blow lands. If the hunter rolled in the last instant (and was close enough to have been hit),
   // it is a perfect dodge: no damage, and main.js answers with slow motion and a counter window.
+  // returns 'perfect', 'hit' or 'miss'
   strike(e, player, inReach, nearMiss, dmg = e.dmg) {
     const r = player.roll;
     if (r && !r.perfect && r.t < PERFECT && (inReach || nearMiss)) {
       r.perfect = true;
       this.onPerfectDodge?.(e);
-      return;
+      return 'perfect';
     }
-    if (inReach && player.hurt(dmg, e.pos.x, e.pos.z)) this.onPlayerHit?.(dmg);
+    if (inReach && player.hurt(dmg, e.pos.x, e.pos.z)) {
+      this.onPlayerHit?.(dmg);
+      return 'hit';
+    }
+    return 'miss';
+  }
+
+  // the witch's hex: one green orb that bends toward the hunter
+  fireHex(e, player) {
+    const from = e.pos.clone().setY(e.pos.y + 2.1 * e.m.root.scale.y); // the lantern on her staff
+    const to = new THREE.Vector3(player.pos.x, player.pos.y + 1, player.pos.z);
+    const mesh = new THREE.Mesh(SHOT_GEO, HEX_MAT);
+    mesh.add(glowSprite(0x60ff90, 1.6, 0.7));
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    this.shots.push({ mesh, vel: to.sub(from).normalize().multiplyScalar(9), life: 4, owner: e, hit: false, dmgMul: 1, homing: 1.6, color: 0x60ff90 });
+    sfx.hexShot(from);
+  }
+
+  // the bride's scream: a ring of sound; close by and not dodged, it stuns the hunter for a moment
+  scream(e, player) {
+    const p = e.pos.clone().setY(centerY(e));
+    this.fx.burst(p, 0xff60c0, 44, { speed: 10, up: 0.4, gravity: 0, life: 0.55, size: 0.15 });
+    sfx.scream(e.pos);
+    const d = Math.hypot(player.pos.x - e.pos.x, player.pos.z - e.pos.z);
+    if (this.strike(e, player, d < SCREAM.radius, d < SCREAM.radius + 2, e.dmg * SCREAM.dmg) === 'hit') {
+      player.stagger(SCREAM.stun);
+      this.onStagger?.();
+    }
   }
 
   // Where a vampire reappears: behind the hunter if that is open ground with nothing in between,
@@ -347,7 +389,7 @@ export class Enemies {
 
     // attack tokens: only a few creatures (bosses aside) wind up a strike or a pounce at the same time
     this.attackers = 0;
-    for (const e of L) if (!e.dying && !e.T.boss && (e.atk >= 0 || e.leap || e.crouch > 0)) this.attackers++;
+    for (const e of L) if (!e.dying && !e.T.boss && (e.atk >= 0 || e.leap || e.crouch > 0 || e.cast > 0 || e.prep > 0 || e.dash)) this.attackers++;
 
     for (let i = L.length - 1; i >= 0; i--) {
       const e = L[i];
@@ -363,19 +405,25 @@ export class Enemies {
     // perfect dodge like any blow, and a dodged orb flies on
     for (let i = this.shots.length - 1; i >= 0; i--) {
       const s = this.shots[i], p = s.mesh.position;
+      if (s.homing && !s.hit) {
+        // bend toward the hunter's chest, keeping the speed
+        const sp = s.vel.length();
+        const want = this.tmpV.set(player.pos.x - p.x, player.pos.y + 1 - p.y, player.pos.z - p.z).setLength(sp);
+        s.vel.lerp(want, 1 - Math.exp(-s.homing * dt)).setLength(sp);
+      }
       p.addScaledVector(s.vel, dt);
       s.mesh.rotation.y += dt * 8;
       s.life -= dt;
-      if (Math.random() < 0.5) this.fx.burst(p, 0xff1030, 1, { speed: 0.4, up: 0, gravity: 0, life: 0.3, size: 0.1 });
+      if (Math.random() < 0.5) this.fx.burst(p, s.color, 1, { speed: 0.4, up: 0, gravity: 0, life: 0.3, size: 0.1 });
       let gone = s.life <= 0 || p.y < heightAt(p.x, p.z);
       const d = Math.hypot(player.pos.x - p.x, player.pos.y + 1 - p.y, player.pos.z - p.z);
       if (!gone && !s.hit && d < 0.85 && !player.dead) {
         s.hit = true;
-        this.strike(s.owner, player, true, true, s.owner.dmg * SHOT_DMG);
+        this.strike(s.owner, player, true, true, s.owner.dmg * s.dmgMul);
         if (!player.roll) gone = true;
       }
       if (gone) {
-        this.fx.burst(p, 0xff1030, 8, { speed: 3, up: 2, life: 0.35, size: 0.1 });
+        this.fx.burst(p, s.color, 8, { speed: 3, up: 2, life: 0.35, size: 0.1 });
         this.scene.remove(s.mesh);
         this.shots.splice(i, 1);
       }
@@ -480,10 +528,32 @@ export class Enemies {
     } else if (e.stun > 0) {
       e.stun -= dt;
     } else if (e.cast > 0) {
-      // the Count raises a hand (eyes glinting), then throws the fan of blood orbs
+      // the Count / the witch raise their hands (eyes glinting), then throw blood orbs / a hex
       if ((e.cast -= dt) <= 0) {
         e.cast = 0;
-        this.fireFan(e, player);
+        if (T.boss) this.fireFan(e, player);
+        else this.fireHex(e, player);
+      }
+    } else if (e.prep > 0) {
+      // a vampire coils for its lunge / a bride draws breath to scream
+      if ((e.prep -= dt) <= 0) {
+        e.prep = 0;
+        if (e.prepKind === 'lunge') e.dash = { t: 0, dx: dx / dist, dz: dz / dist, hit: false };
+        else this.scream(e, player);
+      }
+    } else if (e.dash) {
+      // the lunge: a straight dash that strikes whatever it passes through
+      const d = e.dash;
+      d.t += dt;
+      pos.x += d.dx * LUNGE.speed * dt;
+      pos.z += d.dz * LUNGE.speed * dt;
+      if (!d.hit && (dist < 1.5 || (player.roll && dist < 3))) {
+        d.hit = true;
+        this.strike(e, player, dist < 1.5, true);
+      }
+      if (d.t >= LUNGE.dur) {
+        e.dash = null;
+        e.cd = 0.8;
       }
     } else if (e.crouch > 0) {
       // the werewolf gathers itself (eyes glinting), then pounces at where the hunter is now
@@ -547,8 +617,40 @@ export class Enemies {
           e.pathing = true;
         }
       }
+      // the witch keeps her distance: closes in from afar, backs off (faster when cornered), strafes in between
+      if (T.ranged && !player.dead && !(e.pathing && dist > 13)) {
+        const radial = dist < 6 ? -1 : dist < 8 ? -0.5 : dist > 13 ? 1 : 0;
+        mx = (dx / dist) * radial + (-dz / dist) * e.side * 0.6;
+        mz = (dz / dist) * radial + (dx / dist) * e.side * 0.6;
+        if (dist < 6) speed *= 1.15;
+        if ((e.castCd -= dt) <= 0 && free && !e.hidden && dist > 4 && dist < 18) {
+          e.cast = CAST;
+          e.castCd = 2.6 + Math.random() * 1.5;
+          e.tell = TELL_FLASH;
+          this.attackers++;
+          sfx.attack(e.type, pos);
+        }
+      }
+      // vampire lunge from mid range, with a clear line
+      if (T.lunge && free && !e.hidden && (e.lungeCd -= dt) <= 0 && dist > 4.5 && dist < 9 && !player.dead) {
+        e.prep = LUNGE.prep;
+        e.prepKind = 'lunge';
+        e.lungeCd = 4 + Math.random() * 3;
+        e.tell = TELL_FLASH;
+        this.attackers++;
+        sfx.attack(e.type, pos);
+      }
+      // bride scream when the hunter is close
+      if (T.scream && free && (e.screamCd -= dt) <= 0 && dist < SCREAM.radius - 0.5 && !player.dead) {
+        e.prep = SCREAM.prep;
+        e.prepKind = 'scream';
+        e.screamCd = 6 + Math.random() * 4;
+        e.tell = TELL_FLASH;
+        this.attackers++;
+        sfx.attack(e.type, pos);
+      }
       // no free slot and already close: circle the hunter at the edge of the fight and wait for a turn
-      const wait = !free && !player.dead && !e.pathing && dist < T.range + (T.fly ? 6 : 3.4) * sc;
+      const wait = !free && !player.dead && !e.pathing && !T.ranged && dist < T.range + (T.fly ? 6 : 3.4) * sc;
       if (T.fly && dist > 7 && !wait) {
         // circle around the player before swooping in
         const side = Math.sin(time * 0.8 + e.phase) > 0 ? 1 : -1;
@@ -563,7 +665,7 @@ export class Enemies {
         speed *= 0.4;
       } else if (dist < T.range + 0.3 * sc) {
         speed = 0;
-        if (e.cd <= 0 && !player.dead && free) {
+        if (e.cd <= 0 && !player.dead && free && !e.prep && !e.cast) {
           e.atk = 0;
           e.struck = false;
           e.tell = TELL_FLASH;
@@ -579,7 +681,7 @@ export class Enemies {
         sfx.attack(e.type, pos);
       }
       // vampires dissolve into mist and reappear behind the hunter
-      if (T.blink && !e.cast && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
+      if (T.blink && !e.cast && !e.prep && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
         const spot = this.blinkSpot(player);
         if (!spot) e.blinkCd = 1; // walls all around the hunter's back: try again in a moment
         else {
@@ -665,14 +767,18 @@ export class Enemies {
     if (m.tail) m.tail.rotation.y = Math.sin(time * 8 + e.phase) * 0.4;
     if (m.tail2) m.tail2.rotation.y = Math.sin(time * 8 + e.phase - 0.8) * 0.5;
     if (e.leap) m.spin.rotation.x = -0.6;
-    else if (e.crouch > 0) m.spin.rotation.x = 0.4;
+    else if (e.crouch > 0 || (e.prep > 0 && e.prepKind === 'lunge')) m.spin.rotation.x = 0.4; // coiled
+    else if (e.dash) m.spin.rotation.x = 0.55; // low, fast lunge
+    else if (e.prep > 0) m.spin.rotation.x = -0.35; // bride throws her head back to scream
     else m.spin.rotation.x = e.type === 'bride' ? 0.35 : 0;
 
     // telegraph: a red flash as the windup starts, then the eye glint swells until the blow lands
-    const winding = (e.atk >= 0 && e.atk < W) || e.crouch > 0 || e.cast > 0;
+    const winding = (e.atk >= 0 && e.atk < W) || e.crouch > 0 || e.cast > 0 || e.prep > 0;
     e.glint.visible = winding;
     if (winding) {
-      const p = e.cast > 0 ? 1 - e.cast / CAST : e.crouch > 0 ? 1 - e.crouch / CROUCH : e.atk / W;
+      const p = e.cast > 0 ? 1 - e.cast / CAST
+        : e.prep > 0 ? 1 - e.prep / (e.prepKind === 'lunge' ? LUNGE.prep : SCREAM.prep)
+          : e.crouch > 0 ? 1 - e.crouch / CROUCH : e.atk / W;
       e.glint.scale.setScalar((0.2 + 0.5 * Math.min(1, p * 4)) * (1.15 - 0.25 * p));
     }
 

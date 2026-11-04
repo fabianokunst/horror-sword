@@ -150,6 +150,7 @@ enemies.onBossPhase = (e, stage) => {
   const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z, d = Math.hypot(dx, dz) || 1;
   if (d < 8) { player.vel.x += (dx / d) * 14; player.vel.z += (dz / d) * 14; }
 };
+enemies.onStagger = () => { hud.toast('Atordoado pelo grito! Esquive quando ela inspirar.'); fx.shake += 0.4; };
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
 enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); };

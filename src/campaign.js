@@ -27,23 +27,23 @@ export const CHAPTERS = [
     title: 'Uivos no Moinho', intro: 'A matilha protege o seu senhor.',
     goal: { kind: 'coffin', id: 'windmill', place: 'do Moinho' },
     guards: [{ type: 'wolf', n: 1, name: 'LOBO ALFA', hp: 6, scale: 1.5 }, { type: 'wolf', n: 3 }],
-    density: 10, night: ['wolf', 'wolf', 'ghoul', 'ghoul', 'vampire', 'bat'], day: ['ghoul', 'wolf'],
+    density: 10, night: ['wolf', 'wolf', 'ghoul', 'ghoul', 'vampire', 'bat', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
     title: 'As Noivas da Abadia', intro: 'Três vozes cantam entre as ruínas.',
     goal: { kind: 'coffin', id: 'abbey', place: 'da Abadia' },
     guards: [{ type: 'bride', n: 3, name: 'NOIVA DO CONDE', hp: 3, scale: 1.15, shade: true }],
-    density: 11, night: ['bride', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'ghoul'], day: ['ghoul', 'wolf'],
+    density: 11, night: ['bride', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'ghoul', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
     title: 'Lua de Sangue', intro: 'O selo do castelo se alimenta de sangue.',
     goal: { kind: 'kills', n: 30, night: true }, bloodMoon: true, gate: true,
-    density: 14, night: ['ghoul', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'wolf', 'bride'], day: ['ghoul', 'wolf', 'wolf'],
+    density: 14, night: ['ghoul', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'wolf', 'bride', 'witch'], day: ['ghoul', 'wolf', 'wolf'],
   },
   {
     title: 'O Conde Drácula', intro: 'O portão está aberto. Ele espera por você.',
     goal: { kind: 'boss' }, bloodMoon: true,
-    density: 9, night: ['vampire', 'vampire', 'bat', 'bat', 'bride'], day: ['ghoul', 'wolf'],
+    density: 9, night: ['vampire', 'vampire', 'bat', 'bat', 'bride', 'witch'], day: ['ghoul', 'wolf'],
   },
 ];
 
@@ -129,7 +129,7 @@ export class Campaign {
   spawnConfig() {
     const ch = this.chapter, D = this.diff, c = this.save.cycle;
     return {
-      night: c > 0 ? [...ch.night, 'vampire', 'wolf', 'bride'] : ch.night,
+      night: c > 0 ? [...ch.night, 'vampire', 'wolf', 'bride', 'witch'] : ch.night,
       day: ch.day,
       max: ch.density * D.spawn * (1 + 0.15 * c),
       interval: Math.max(0.6, (2.6 - 0.25 * this.save.chapter - 0.3 * c) / D.spawn),

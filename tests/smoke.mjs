@@ -179,6 +179,57 @@ async function desktop(browser, url, errors) {
   check('Dracula phase 3 (fury) still alive to fight', boss.stage3 && boss.alive && boss.phases.join() === '2,3', boss);
   await page.evaluate(() => __hs.enemies.reset());
 
+  // new moves: the witch hexes from range and backs off, the vampire lunges, the bride's scream stuns
+  const moves = await page.evaluate(() => new Promise((res) => {
+    const { enemies, player } = __hs;
+    __hs.setDay(0.8);
+    enemies.reset();
+    const P = { x: player.pos.x, z: player.pos.z };
+    const w = enemies.spawnAt('witch', P.x + 10, P.z);
+    w.castCd = 0.2;
+    w.cd = 1e9;
+    let n = 0, hexed = false, homing = false, stage = 'hex', fleeStart = 0, fled = false, lunged = false, stunned = false, v, b;
+    const tick = () => {
+      player.pos.x = P.x; player.pos.z = P.z; player.vel.set(0, 0, 0);
+      if (stage === 'hex') {
+        if (enemies.shots.some((s) => s.homing > 0)) { hexed = true; homing = true; }
+        if (hexed || n > 300) {
+          stage = 'flee';
+          w.pos.set(P.x + 3, w.pos.y, P.z);
+          fleeStart = 3;
+        }
+      } else if (stage === 'flee') {
+        const d = Math.hypot(w.pos.x - P.x, w.pos.z - P.z);
+        if (d > fleeStart + 1.5) fled = true;
+        if (fled || n > 450) {
+          stage = 'lunge';
+          enemies.reset();
+          v = enemies.spawnAt('vampire', P.x + 7, P.z);
+          Object.assign(v, { blinkCd: 99, lungeCd: 0, cd: 1e9 });
+        }
+      } else if (stage === 'lunge') {
+        if (v.dash) lunged = true;
+        if (lunged || n > 650) {
+          stage = 'scream';
+          enemies.reset();
+          b = enemies.spawnAt('bride', P.x + 3, P.z);
+          Object.assign(b, { screamCd: 0, cd: 1e9 });
+        }
+      } else if (stage === 'scream') {
+        if (player.stun > 0) stunned = true;
+        if (stunned || n > 900) return res({ hexed, homing, fled, lunged, stunned, frames: n });
+      }
+      n++;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('witch hexes from range with a homing orb', moves.hexed && moves.homing, moves);
+  check('witch backs off when the hunter closes in', moves.fled, moves);
+  check('vampire lunges from mid range', moves.lunged, moves);
+  check("bride's scream stuns a hunter who doesn't dodge", moves.stunned, moves);
+  await page.evaluate(() => __hs.enemies.reset());
+
   // target lock on R, released on R
   await crowd(page, 'ghoul', 3, 6);
   await page.keyboard.press('KeyR');
