@@ -148,6 +148,37 @@ async function desktop(browser, url, errors) {
     check('counter window strengthens the next swing', swing.counter === true, swing);
   }
 
+  // Count Dracula: phase 2 (mist, untouchable, blood orbs), a huge hit can't skip it, then phase 3
+  const boss = await page.evaluate(() => new Promise((res) => {
+    const { enemies, player } = __hs;
+    enemies.reset();
+    let phases = [];
+    enemies.onBossPhase = ((prev) => (e, s) => { phases.push(s); prev?.(e, s); })(enemies.onBossPhase);
+    const d = enemies.spawnAt('dracula', player.pos.x, player.pos.z + 9);
+    enemies.damage(d, d.maxHp * 0.9, 0, 1); // would skip phase 2 if not clamped
+    const afterHit = { stage: d.stage, frac: +(d.hp / d.maxHp).toFixed(2), shield: d.shield > 0 };
+    const hpShielded = d.hp;
+    enemies.damage(d, 5, 0, 1);
+    const shieldHolds = d.hp === hpShielded;
+    let n = 0, sawCast = false, sawShot = false;
+    const tick = () => {
+      player.pos.z = d.pos.z - 9; // keep the distance so he throws orbs instead of striking
+      if (d.cast > 0) sawCast = true;
+      if (enemies.shots.length) sawShot = true;
+      if (sawShot || ++n > 600) {
+        d.shield = 0;
+        enemies.damage(d, d.maxHp * 0.3, 0, 1);
+        return res({ afterHit, shieldHolds, sawCast, sawShot, stage3: d.stage === 3, alive: !d.dying, phases });
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('Dracula phase 2: one phase per hit, untouchable while changing', boss.afterHit.stage === 2 && boss.afterHit.frac >= 0.33 && boss.afterHit.shield && boss.shieldHolds, boss);
+  check('Dracula phase 2 throws telegraphed blood orbs', boss.sawCast && boss.sawShot, boss);
+  check('Dracula phase 3 (fury) still alive to fight', boss.stage3 && boss.alive && boss.phases.join() === '2,3', boss);
+  await page.evaluate(() => __hs.enemies.reset());
+
   // target lock on R, released on R
   await crowd(page, 'ghoul', 3, 6);
   await page.keyboard.press('KeyR');

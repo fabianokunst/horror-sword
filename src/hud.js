@@ -139,6 +139,8 @@ export class Hud {
     this.el.souls.textContent = enemies.souls;
     const boss = enemies.boss;
     this.el.boss.classList.toggle('hidden', !boss);
+    // the Count's bar shows where his phases begin (enemies.js BOSS_PHASES)
+    this.el.boss.classList.toggle('phased', !!boss?.T.boss);
     if (boss) {
       this.el.bossName.textContent = boss.name ?? boss.T.name;
       this.el.bossFill.style.width = Math.max(0, boss.hp / (boss.maxHp ?? boss.T.hp)) * 100 + '%';

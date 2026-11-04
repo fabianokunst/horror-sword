@@ -486,6 +486,20 @@ const S = {
     [49, 52, 55, 58, 61, 64].forEach((m, i) => organ(o, T + 3.2 + i * 0.09, hz(m), 1.6 - i * 0.09, 0.03));
     for (const m of [50, 53, 57, 62, 65, 69]) organ(o, T + 4.9, hz(m), 1.9, 0.03);
   },
+  // the Count changes phase: thunder, his low laugh and a D-minor organ stab
+  bossPhase(t, pos) {
+    thunder(out(null, 0.4), t, 0.7);
+    creature('dracula').idle(out(pos, 0.4), t + 0.3);
+    const o = out(null, 0.6);
+    for (const m of [38, 50, 53, 57, 62]) organ(o, t + 0.1, hz(m), 1.4, 0.035);
+  },
+  // blood orbs leaving the Count's hand: a wet, rising whoosh
+  bloodShot(t, pos) {
+    const o = out(pos, 0.3);
+    noise(o, t, 'bandpass', 400, 1800, 0.35, 0.5, 2, 0.02);
+    noise(o, t, 'lowpass', 900, 200, 0.2, 0.4, 1, 0.002);
+    osc(o, t, 'sine', 180, 320, 0.25, 0.2, 0.01);
+  },
   // coffin of earth splintering: wood cracks, debris and a sigh of escaping evil
   smash(t) {
     const o = out(null, 0.35);

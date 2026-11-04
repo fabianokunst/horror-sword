@@ -140,6 +140,16 @@ enemies.onPerfectDodge = () => {
   hud.toast('✦ Esquiva perfeita — contra-ataque!');
   buzz(30, 0.3);
 };
+// the Count changes phase: title card, organ and thunder, and a shockwave that throws the hunter back
+enemies.onBossPhase = (e, stage) => {
+  hud.message(stage === 2 ? 'NÉVOA E SANGUE' : 'A FÚRIA DO CONDE',
+    stage === 2 ? 'O Conde se desfaz em névoa... cuidado com o sangue que ele lança.' : 'Ferido, ele golpeia duas vezes e não dá trégua.', 3.5);
+  sfx.bossPhase(e.pos);
+  fx.shake += 0.8;
+  buzz(120, 1);
+  const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z, d = Math.hypot(dx, dz) || 1;
+  if (d < 8) { player.vel.x += (dx / d) * 14; player.vel.z += (dz / d) * 14; }
+};
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
 enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); };

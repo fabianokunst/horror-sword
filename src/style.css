@@ -98,7 +98,13 @@ body.touch #tl { max-width: calc(100vw - var(--map) - 44px - var(--pad) * 4 - va
   text-align: center;
 }
 #bossName { font-family: 'Pirata One', serif; font-size: clamp(18px, 2.6vmin, 36px); color: #ff4060; text-shadow: 2px 2px 0 #000; }
-#boss .bar { height: clamp(8px, 1.1vmin, 16px); }
+#boss .bar { height: clamp(8px, 1.1vmin, 16px); position: relative; }
+/* phase marks on Count Dracula's bar, at 33% and 66% */
+#boss.phased .bar::before, #boss.phased .bar::after {
+  content: ''; position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f0d080; box-shadow: 0 0 0 1px #000;
+}
+#boss.phased .bar::before { left: 33%; }
+#boss.phased .bar::after { left: 66%; }
 #bossFill { background: linear-gradient(#c040ff, #5a0a8a); }
 /* keep the boss bar between the stick and the buttons (or above them in portrait) */
 body.touch #boss { width: min(38vw, 420px); bottom: calc(var(--pad) + var(--sb)); }

@@ -30,6 +30,16 @@ const PERFECT = 0.25;
 // mist-blink: angles tried around "right behind the hunter", nearest first
 const BLINK_OFFSETS = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8, 2.4, -2.4];
 
+// Count Dracula fights in three phases, entered below these fractions of his health (see bossPhase):
+// 2 — mist and blood: fans of blood orbs between his strikes; 3 — fury: faster, double strikes, more blinks.
+const BOSS_PHASES = [0.66, 0.33];
+const SHIELD = 1.6; // seconds he is untouchable while changing
+const CAST = 0.65; // blood-orb windup (the eyes glint as for a strike)
+const SHOT_GEO = new THREE.OctahedronGeometry(0.22, 0);
+const SHOT_MAT = basic(0xff1a30, 2.2);
+const SHOT_SPEED = 13;
+const SHOT_DMG = 0.6; // of his strike damage
+
 // roaming creatures when no campaign chapter is driving the spawns
 const DEFAULT_SPAWN = { max: 8, interval: 2.6, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul', 'wolf'] };
 
@@ -55,6 +65,8 @@ export class Enemies {
     this.onKill = null;
     this.onSoul = null;
     this.onPerfectDodge = null;
+    this.onBossPhase = null; // (boss, phase 2 | 3)
+    this.shots = []; // the Count's blood orbs
     // set by the campaign: difficulty x chapter scaling, elite odds, XP per soul and how many creatures
     // may attack at once (the rest circle the hunter and wait their turn)
     this.mods = { hp: 1, dmg: 1, elite: 0, xp: 1, attackers: 3 };
@@ -98,7 +110,8 @@ export class Enemies {
     for (const e of this.list) this.scene.remove(e.m.root);
     for (const o of this.orbs) this.scene.remove(o.mesh);
     for (const b of this.bolts) this.scene.remove(b.mesh);
-    this.list.length = this.orbs.length = this.bolts.length = 0;
+    for (const s of this.shots) this.scene.remove(s.mesh);
+    this.list.length = this.orbs.length = this.bolts.length = this.shots.length = 0;
     this.boss = null;
     this.spawnTimer = 3;
   }
@@ -131,15 +144,65 @@ export class Enemies {
     else if (m.body) { m.body.add(e.glint); e.glint.position.set(0, 0.06, 0.36); }
     else { m.root.add(e.glint); e.glint.position.y = T.center ?? 1.6; }
     this.applyMods(e);
+    if (T.boss) Object.assign(e, { stage: 1, shield: 0, cast: 0, castCd: 2.5, second: false });
     this.list.push(e);
     if (T.boss) this.boss = e;
     return e;
   }
 
+  // The Count crosses into his next phase: a moment of mist (untouchable), bats, and new tricks.
+  // One phase per hit, so a huge blow can't skip the second one.
+  bossPhase(e) {
+    const f = e.hp / e.maxHp;
+    const want = f < BOSS_PHASES[1] ? 3 : f < BOSS_PHASES[0] ? 2 : 1;
+    if (want <= e.stage) return;
+    e.stage++;
+    if (e.stage === 2) e.hp = Math.max(e.hp, e.maxHp * BOSS_PHASES[1] + 0.01);
+    else e.hp = Math.max(e.hp, e.maxHp * 0.08); // the fury always gets its moment
+    Object.assign(e, { shield: SHIELD, atk: -1, cast: 0, stun: 0, second: false, castCd: 1.2 });
+    const p = e.pos.clone().setY(e.pos.y + 1.2);
+    this.fx.burst(p, 0x8a2ad0, 50, { speed: 6, up: 4, gravity: 1, life: 1.2, size: 0.3 });
+    this.fx.burst(p, 0xff1030, 30, { speed: 8, up: 5, life: 0.9, size: 0.18 });
+    for (let i = 0; i < (e.stage === 2 ? 4 : 3); i++) this.spawn('bat', e.pos.x, e.pos.z, 4, 9);
+    if (e.stage === 3) {
+      e.speedMul *= 1.3;
+      e.windup = 0.36;
+      e.blinkBase = 2.2;
+      const aura = glowSprite(0xff1030, 3.4, 0.55);
+      aura.position.y = 1.3;
+      e.m.root.add(aura);
+      this.spawn('bride', e.pos.x, e.pos.z, 6, 12);
+    }
+    this.onBossPhase?.(e, e.stage);
+  }
+
+  // a fan of blood orbs aimed at the hunter (3 in the second phase, 5 in the third)
+  fireFan(e, player) {
+    const n = e.stage >= 3 ? 5 : 3, spread = 0.22;
+    const from = e.pos.clone().setY(centerY(e) + 0.3);
+    const tx = player.pos.x - from.x, tz = player.pos.z - from.z, flat = Math.hypot(tx, tz) || 1;
+    const base = Math.atan2(tx, tz), rise = (player.pos.y + 1 - from.y) / flat;
+    for (let i = 0; i < n; i++) {
+      const a = base + (i - (n - 1) / 2) * spread;
+      const mesh = new THREE.Mesh(SHOT_GEO, SHOT_MAT);
+      mesh.add(glowSprite(0xff2030, 1.6, 0.7));
+      mesh.position.copy(from);
+      this.scene.add(mesh);
+      this.shots.push({ mesh, vel: new THREE.Vector3(Math.sin(a), rise, Math.cos(a)).normalize().multiplyScalar(SHOT_SPEED), life: 3, owner: e, hit: false });
+    }
+    sfx.bloodShot(from);
+  }
+
   // --- combat
   damage(e, dmg, dirX, dirZ, knock = 7) {
     if (e.dying) return;
+    if (e.shield > 0) {
+      // changing phase: blows glance off the mist
+      this.fx.burst(e.pos.clone().setY(centerY(e)), 0xc0a0ff, 6, { speed: 4, up: 2, life: 0.25, size: 0.08 });
+      return;
+    }
     e.hp -= dmg;
+    if (e.T.boss) this.bossPhase(e);
     e.flash = 0.1;
     e.stun = e.T.boss ? 0.08 : 0.28;
     const k = e.T.boss ? knock * 0.25 : knock;
@@ -217,14 +280,14 @@ export class Enemies {
 
   // A blow lands. If the hunter rolled in the last instant (and was close enough to have been hit),
   // it is a perfect dodge: no damage, and main.js answers with slow motion and a counter window.
-  strike(e, player, inReach, nearMiss) {
+  strike(e, player, inReach, nearMiss, dmg = e.dmg) {
     const r = player.roll;
     if (r && !r.perfect && r.t < PERFECT && (inReach || nearMiss)) {
       r.perfect = true;
       this.onPerfectDodge?.(e);
       return;
     }
-    if (inReach && player.hurt(e.dmg, e.pos.x, e.pos.z)) this.onPlayerHit?.(e.dmg);
+    if (inReach && player.hurt(dmg, e.pos.x, e.pos.z)) this.onPlayerHit?.(dmg);
   }
 
   // Where a vampire reappears: behind the hunter if that is open ground with nothing in between,
@@ -295,6 +358,28 @@ export class Enemies {
       }
     }
     if (!this.boss) this.boss = L.find((e) => e.name && !e.dying) || null;
+
+    // the Count's blood orbs live in the creatures' (possibly slowed) time; a roll at the last instant is a
+    // perfect dodge like any blow, and a dodged orb flies on
+    for (let i = this.shots.length - 1; i >= 0; i--) {
+      const s = this.shots[i], p = s.mesh.position;
+      p.addScaledVector(s.vel, dt);
+      s.mesh.rotation.y += dt * 8;
+      s.life -= dt;
+      if (Math.random() < 0.5) this.fx.burst(p, 0xff1030, 1, { speed: 0.4, up: 0, gravity: 0, life: 0.3, size: 0.1 });
+      let gone = s.life <= 0 || p.y < heightAt(p.x, p.z);
+      const d = Math.hypot(player.pos.x - p.x, player.pos.y + 1 - p.y, player.pos.z - p.z);
+      if (!gone && !s.hit && d < 0.85 && !player.dead) {
+        s.hit = true;
+        this.strike(s.owner, player, true, true, s.owner.dmg * SHOT_DMG);
+        if (!player.roll) gone = true;
+      }
+      if (gone) {
+        this.fx.burst(p, 0xff1030, 8, { speed: 3, up: 2, life: 0.35, size: 0.1 });
+        this.scene.remove(s.mesh);
+        this.shots.splice(i, 1);
+      }
+    }
 
     // soul orbs and bolts belong to the hunter: they ignore the slow motion
     dt = realDt;
@@ -384,11 +469,22 @@ export class Enemies {
 
     // a free attack slot (bosses never wait for one)
     const free = T.boss || this.attackers < this.mods.attackers;
+    const W = e.windup || T.windup; // the Count's fury shortens his windup
     let speed = 0;
     let mx = 0, mz = 0;
     e.pathing = false; // walking around an obstacle this frame (set in the chase below)
-    if (e.stun > 0) {
+    if (e.shield > 0) {
+      // changing phase: a column of mist, untouchable
+      e.shield -= dt;
+      if (Math.random() < 0.7) this.fx.burst(pos.clone().setY(pos.y + 0.5 + Math.random() * 2), Math.random() < 0.6 ? 0x8a2ad0 : 0xff1030, 3, { speed: 2, up: 3, gravity: 0, life: 0.7, size: 0.22 });
+    } else if (e.stun > 0) {
       e.stun -= dt;
+    } else if (e.cast > 0) {
+      // the Count raises a hand (eyes glinting), then throws the fan of blood orbs
+      if ((e.cast -= dt) <= 0) {
+        e.cast = 0;
+        this.fireFan(e, player);
+      }
     } else if (e.crouch > 0) {
       // the werewolf gathers itself (eyes glinting), then pounces at where the hunter is now
       if ((e.crouch -= dt) <= 0) {
@@ -412,16 +508,26 @@ export class Enemies {
       }
     } else if (e.atk >= 0) {
       e.atk += dt;
-      if (e.atk >= T.windup && !e.struck) {
+      if (e.atk >= W && !e.struck) {
         e.struck = true;
         const reach = T.range + 0.8 * sc;
         const dy = Math.abs(player.pos.y + 1 - centerY(e));
         this.strike(e, player, dist < reach && dy < 2.5, dist < reach + 2.5 && dy < 3);
         if (T.fly) { e.kx = (-dx / dist) * 10; e.kz = (-dz / dist) * 10; }
       }
-      if (e.atk >= T.windup + 0.3) {
-        e.atk = -1;
-        e.cd = (T.boss ? 0.7 : 0.9) + Math.random() * 0.6;
+      if (e.atk >= W + 0.3) {
+        if (T.boss && e.stage === 3 && !e.second) {
+          // fury: a second blow right after the first (telegraphed again)
+          e.second = true;
+          e.atk = 0;
+          e.struck = false;
+          e.tell = TELL_FLASH;
+          sfx.attack(e.type, pos);
+        } else {
+          e.second = false;
+          e.atk = -1;
+          e.cd = (T.boss ? 0.7 : 0.9) + Math.random() * 0.6;
+        }
       }
     } else {
       e.cd -= dt;
@@ -465,8 +571,15 @@ export class Enemies {
           sfx.attack(e.type, pos);
         }
       }
+      // the Count, from his second phase on: blood orbs when the hunter keeps their distance
+      if (T.boss && e.stage >= 2 && e.atk < 0 && (e.castCd -= dt) <= 0 && dist > 4.5 && dist < 26 && !player.dead) {
+        e.cast = CAST;
+        e.castCd = e.stage >= 3 ? 3 : 4.5;
+        e.tell = TELL_FLASH;
+        sfx.attack(e.type, pos);
+      }
       // vampires dissolve into mist and reappear behind the hunter
-      if (T.blink && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
+      if (T.blink && !e.cast && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
         const spot = this.blinkSpot(player);
         if (!spot) e.blinkCd = 1; // walls all around the hunter's back: try again in a moment
         else {
@@ -474,7 +587,7 @@ export class Enemies {
           pos.x = spot.x;
           pos.z = spot.z;
           this.fx.burst(pos.clone().setY(groundAt(pos.x, pos.z) + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
-          e.blinkCd = T.blink + Math.random() * 4;
+          e.blinkCd = (e.blinkBase ?? T.blink) + Math.random() * (e.blinkBase ? 2 : 4);
           e.cd = 0.35;
           e.hidden = false;
           sfx.blink(pos);
@@ -523,12 +636,13 @@ export class Enemies {
     if (m.spine) m.spine.rotation.x = e.type === 'ghoul' ? 0.5 : e.type === 'wolf' ? 0.35 + amt * 0.15 : 0.05;
     if (m.neck) m.neck.rotation.x = e.type === 'ghoul' || e.type === 'wolf' ? -0.35 : 0;
     if (m.foreL) {
-      const bend = e.atk >= 0 ? (e.atk < T.windup ? -0.9 : -0.1) : e.type === 'bride' ? -0.6 : -0.35;
+      const bend = e.atk >= 0 ? (e.atk < W ? -0.9 : -0.1) : e.type === 'bride' ? -0.6 : -0.35;
       m.foreL.rotation.x = m.foreR.rotation.x = bend;
     }
     if (m.armL) {
       let ax;
-      if (e.atk >= 0) ax = e.atk < T.windup ? -0.5 - (e.atk / T.windup) * 2.2 : -1.1;
+      if (e.cast > 0) ax = -2.4; // arms raised to throw the blood orbs
+      else if (e.atk >= 0) ax = e.atk < W ? -0.5 - (e.atk / W) * 2.2 : -1.1;
       else if (e.type === 'ghoul' || e.type === 'wolf') ax = -1.1 + sw * 0.3;
       else if (e.type === 'bride') ax = -0.4 + Math.sin(time * 3 + e.phase) * 0.2;
       else ax = sw * 0.5;
@@ -555,10 +669,10 @@ export class Enemies {
     else m.spin.rotation.x = e.type === 'bride' ? 0.35 : 0;
 
     // telegraph: a red flash as the windup starts, then the eye glint swells until the blow lands
-    const winding = (e.atk >= 0 && e.atk < T.windup) || e.crouch > 0;
+    const winding = (e.atk >= 0 && e.atk < W) || e.crouch > 0 || e.cast > 0;
     e.glint.visible = winding;
     if (winding) {
-      const p = e.crouch > 0 ? 1 - e.crouch / CROUCH : e.atk / T.windup;
+      const p = e.cast > 0 ? 1 - e.cast / CAST : e.crouch > 0 ? 1 - e.crouch / CROUCH : e.atk / W;
       e.glint.scale.setScalar((0.2 + 0.5 * Math.min(1, p * 4)) * (1.15 - 0.25 * p));
     }
 
