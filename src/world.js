@@ -234,6 +234,7 @@ export class World {
     this.onPlaceEnter = null;
     this.onCoffinDestroyed = null;
     this.siteTrees = [];
+    this.sites = []; // every landmark (camcollide.js keeps the camera out of them)
     this.buildTerrain();
     this.buildSites();
     this.buildVegetation();
@@ -286,6 +287,7 @@ export class World {
   }
 
   addSite(site) {
+    this.sites.push(site);
     this.scene.add(site.root);
     for (const o of site.obstacles) this.addObstacle(o);
     this.lights.push(...site.lights);

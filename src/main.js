@@ -16,6 +16,7 @@ import { HuntMenu } from './menu.js';
 import { initAudio, sfx, updateAmbient, setListener, setPaused, toggleMute, isMuted } from './audio.js';
 import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
+import { CameraCollider } from './camcollide.js';
 
 const CYCLE = 240; // seconds for a full day/night
 // perfect dodge: creatures crawl at WITCH_SLOW speed for WITCH real seconds, the blade hits harder a bit longer
@@ -103,6 +104,7 @@ const hud = new Hud();
 const inv = new Inventory(scene, player, fx, renderer);
 const lock = new LockOn(scene);
 lock.btn = document.querySelector('#touch [data-key="KeyR"]');
+const camCol = new CameraCollider(world);
 
 const spawnPt = findSpawn();
 player.pos.set(spawnPt.x, heightAt(spawnPt.x, spawnPt.z), spawnPt.z);
@@ -423,7 +425,9 @@ const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
 const camDir = new THREE.Vector3();
 const camLook = new THREE.Vector3();
+const camBack = new THREE.Vector3();
 const witchTint = new THREE.Vector3();
+let camDist = 7; // current camera distance, pulled in by walls (see camcollide.js)
 
 function frame() {
   requestAnimationFrame(frame);
@@ -557,14 +561,16 @@ function frame() {
 
   // third-person camera
   camTarget.set(player.pos.x, player.pos.y + 1.7, player.pos.z);
-  const dist = state === 'menu' ? 7 : 5.4;
-  camera.position.set(
-    camTarget.x + Math.sin(camYaw) * Math.cos(camPitch) * dist,
-    camTarget.y + Math.sin(camPitch) * dist,
-    camTarget.z + Math.cos(camYaw) * Math.cos(camPitch) * dist
-  );
+  const want = state === 'menu' ? 7 : 5.4;
+  camBack.set(Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw) * Math.cos(camPitch));
+  // a wall or roof behind the hunter pulls the camera in at once (never show through it); open space lets it ease back
+  const room = camCol.clear(camTarget, camBack, want);
+  camDist = room < camDist ? room : camDist + (room - camDist) * (1 - Math.exp(-4 * rawDt));
+  camera.position.copy(camTarget).addScaledVector(camBack, camDist);
   const floor = Math.max(heightAt(camera.position.x, camera.position.z), WATER) + 0.5;
   if (camera.position.y < floor) camera.position.y = floor;
+  // camera right behind the head: hide the hunter instead of filling the screen with the coat
+  if (camDist < 1) player.m.root.visible = false;
   if (fx.shake > 0) {
     const s = fx.shake * 0.25;
     camera.position.x += (Math.random() - 0.5) * s;
@@ -581,7 +587,8 @@ frame();
 
 if (import.meta.env.DEV) {
   window.__hs = {
-    player, enemies, world, sfx, campaign, lock, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
-    state: () => state, witch: () => witch, cam: () => camYaw,
+    player, enemies, world, sfx, campaign, lock, camera, camCol, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    state: () => state, witch: () => witch, cam: () => camYaw, camDist: () => camDist,
+    setCam: (yaw, pitch) => { camYaw = yaw; if (pitch != null) camPitch = pitch; },
   };
 }

@@ -95,6 +95,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/player.js` — movimento, combo, esquiva, besta; atributos vindos dos dons (`applyStats`) e cor do título (`setRank`).
 - `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
 - `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
+- `src/camcollide.js` — colisão da câmera: um raio por quadro da cabeça do caçador até a câmera, contra as construções (malhas grandes como o castelo são divididas em pedaços de 6 m para o raio testar só os triângulos próximos) e o relevo. Paredes e telhados puxam a câmera na hora; ela volta suave quando o caminho abre; colada demais, o caçador some para não tapar a tela. Árvores ficam de fora de propósito (a câmera ficaria entrando e saindo nas florestas).
 - `src/campaign.js` — capítulos e objetivos, escala por capítulo/ciclo, XP e level-up, checkpoints, morte por dificuldade e novo jogo+.
 - `src/progress.js` — dificuldades, dons, títulos, curva de XP e leitura/gravação do save no `localStorage`.
 - `src/menu.js`, `src/campaign.css` — painel do menu (continuar / nova caçada / dificuldade) e estilos de XP, toast e cartas de dom.
