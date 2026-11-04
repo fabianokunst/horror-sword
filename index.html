@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Horror Sword</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M8 0l2 10H6z' fill='%2340e8ff'/><rect x='4' y='10' width='8' height='2' fill='%23f0bc40'/><rect x='7' y='12' width='2' height='4' fill='%237a4422'/></svg>" />
+    <!-- fonts (Pirata One, VT323) are self-hosted via @fontsource, imported in src/main.js -->
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="vignette"></div>
+
+    <div id="hud" class="hidden">
+      <div id="tl">
+        <div id="bars">
+          <div class="bar hp"><div id="hpFill"></div></div>
+          <div class="bar st"><div id="stFill"></div></div>
+        </div>
+        <div id="stats">
+          <div><span id="nightLbl">CREPÚSCULO</span> · <span id="clock">17:00</span></div>
+          <div>☠ <span id="kills">0</span> &nbsp; ✦ <span id="souls">0</span></div>
+        </div>
+        <!-- top-centre on wide screens; in portrait it flows under the stats (see style.css) -->
+        <div id="objective"></div>
+      </div>
+      <canvas id="minimap" width="140" height="140"></canvas>
+      <div id="boss" class="hidden">
+        <div id="bossName">LORDE VAMPIRO</div>
+        <div class="bar"><div id="bossFill"></div></div>
+      </div>
+      <div id="msg"><div id="msgTitle"></div><div id="msgSub"></div></div>
+    </div>
+
+    <!-- on-screen controls for phones/tablets (shown only in touch mode while playing) -->
+    <div id="touch" class="hidden">
+      <div id="stick"><div id="knob"></div></div>
+      <div class="tb" id="tbPause" aria-label="Pausar">
+        <svg viewBox="0 0 24 24"><path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" /></svg>
+      </div>
+      <div id="cluster">
+        <div class="tb big" data-key="Mouse0" data-repeat aria-label="Espada">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20.5 3.5L9.5 14.5M5.5 11.5l7 7M8 16l-4.5 4.5" /></svg>
+        </div>
+        <div class="tb" data-key="KeyC" style="--dx: -1; --dy: 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 13a7 7 0 1 1-2.5-6.5M18 3v5h-5" /></svg>
+          <small>ESQUIVA</small>
+        </div>
+        <div class="tb" data-key="KeyQ" style="--dx: -0.866; --dy: -0.5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 20L19 5M12 5h7v7M4 20v-4M4 20h4" /></svg>
+          <small>BESTA</small><b id="ammo">6</b>
+        </div>
+        <div class="tb" data-key="Space" style="--dx: -0.5; --dy: -0.866">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 15l7-7 7 7M5 20h14" /></svg>
+          <small>PULO</small>
+        </div>
+        <div class="tb" id="tbSprint" style="--dx: 0; --dy: -1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 6l6 6-6 6M12 6l6 6-6 6" /></svg>
+          <small>CORRER</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- two groups so short landscape screens (phones) can show them side by side -->
+    <div id="menu" class="overlay">
+      <div class="menu-intro">
+      <h1>Horror Sword</h1>
+      <h2>O Caçador da Noite</h2>
+      <p class="lore">
+        Quando o sol se põe, os mortos se levantam. Vampiros, carniçais e morcegos tomam a floresta.<br />
+        Com sua lâmina rúnica, sobreviva às noites e colha as almas das criaturas.
+      </p>
+      <div class="controls desk-only">
+        <span>WASD</span> mover &nbsp; <span>Mouse</span> câmera &nbsp; <span>Shift</span> correr &nbsp; <span>Espaço</span> pular<br />
+        <span>Clique Esq.</span> espada (combo x3) &nbsp; <span>Clique Dir. / Ctrl</span> esquiva &nbsp; <span>Q / F</span> besta de prata<br />
+        Vampiros queimam ao amanhecer · Almas curam · Na Lua de Sangue, o Conde vem &nbsp; <span>Esc</span> pausa &nbsp; <span>M</span> som
+      </div>
+      <div class="controls touch-only">
+        <span>Lado esquerdo</span> mover &nbsp; <span>Lado direito</span> arrastar a câmera<br />
+        <span>Espada</span> segure para o combo &nbsp; <span>Esquiva</span> <span>Besta</span> <span>Pulo</span> <span>Correr</span><br />
+        Vampiros queimam ao amanhecer · Almas curam · Na Lua de Sangue, o Conde vem
+      </div>
+      </div>
+      <div class="menu-actions">
+      <p class="rotate-hint">↻ Gire o aparelho na horizontal para jogar melhor</p>
+      <button id="play">CAÇAR</button>
+      <button id="settingsBtn" class="secondary">CONFIGURAÇÕES</button>
+      <button id="soundBtn" class="secondary">♪ SOM: LIGADO</button>
+      <p class="credits">Software livre · <a href="THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener">Licenças e créditos</a></p>
+      </div>
+    </div>
+
+    <div id="dead" class="overlay hidden">
+      <h1>Você Caiu</h1>
+      <p id="deadStats"></p>
+      <button id="retry">TENTAR NOVAMENTE</button>
+    </div>
+
+    <div id="win" class="overlay hidden">
+      <h1>Vitória</h1>
+      <h2>O Conde Drácula foi destruído</h2>
+      <p id="winStats"></p>
+      <button id="winRetry">CAÇAR NOVAMENTE</button>
+    </div>
+
+    <!-- video settings, built by src/settings.js -->
+    <div id="settings" class="hidden"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,230 @@
+/* ------------------------------------------------------------------ inventory (survival-horror style) */
+#inv {
+  --g: clamp(6px, 1.4vmin, 12px);
+  --slot: clamp(46px, 12.5vmin, 92px);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(8px, var(--st, 0px)) max(8px, var(--sr, 0px)) max(8px, var(--sb, 0px)) max(8px, var(--sl, 0px));
+  background: radial-gradient(ellipse at center, rgba(10, 14, 28, 0.82), rgba(0, 0, 0, 0.94));
+  font-family: 'VT323', monospace;
+  color: #e8dcc8;
+  touch-action: pan-y;
+}
+/* CRT scanlines over the whole screen */
+#inv::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+  z-index: 1;
+}
+
+.inv-win {
+  position: relative;
+  width: min(900px, 100%);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--g);
+}
+
+.inv-head { display: flex; align-items: center; justify-content: space-between; }
+.inv-head span {
+  font-family: 'Pirata One', serif;
+  font-size: clamp(24px, 5.5vmin, 46px);
+  color: #e0203a;
+  letter-spacing: 4px;
+  text-shadow: 3px 3px 0 #2a0008, 0 0 18px rgba(255, 30, 60, 0.4);
+}
+.inv-x {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-family: 'VT323', monospace;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.inv-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--g);
+}
+.inv-col { display: flex; flex-direction: column; gap: var(--g); min-width: 0; }
+
+.inv-box {
+  background: linear-gradient(180deg, rgba(24, 30, 48, 0.94), rgba(8, 10, 18, 0.94));
+  border: 2px solid #8a6a3a;
+  box-shadow: inset 0 0 0 2px #05040a, inset 0 0 20px rgba(70, 120, 200, 0.12), 3px 3px 0 #000;
+  padding: var(--g);
+}
+.inv-lbl { font-size: clamp(14px, 2.8vmin, 20px); color: #c8a060; letter-spacing: 2px; margin-bottom: 4px; }
+
+/* condition: ECG + label */
+.inv-ecg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 160 / 48;
+  background: #02060a;
+  border: 1px solid #24323c;
+  image-rendering: pixelated;
+}
+.inv-state {
+  margin-top: 4px;
+  font-size: clamp(20px, 4.6vmin, 36px);
+  letter-spacing: 4px;
+  text-shadow: 0 0 8px currentColor, 2px 2px 0 #000;
+}
+
+/* equipped weapons */
+.inv-equip { flex: 1; }
+.inv-eq { display: flex; align-items: center; gap: 8px; font-size: clamp(15px, 3vmin, 22px); line-height: 1; }
+.inv-eq + .inv-eq { margin-top: 4px; }
+.inv-eq img { width: calc(var(--slot) * 0.66); height: calc(var(--slot) * 0.66); image-rendering: pixelated; flex-shrink: 0; }
+.inv-eq span { flex: 1; min-width: 0; }
+.inv-eq em { font-style: normal; color: #60e8ff; white-space: nowrap; }
+.inv-eq em.inv-bless { color: #ffd060; text-shadow: 0 0 6px #ffb020; }
+
+/* item grid */
+.inv-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, var(--slot));
+  grid-auto-rows: var(--slot);
+  gap: calc(var(--g) * 0.8);
+  align-content: center;
+}
+.inv-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, #182234, #06080e 75%);
+  border: 2px solid #3a4658;
+  box-shadow: inset 0 0 0 1px #000;
+  cursor: pointer;
+}
+.inv-slot img { width: 94%; height: 94%; image-rendering: pixelated; pointer-events: none; }
+.inv-slot img:not([src]) { visibility: hidden; }
+.inv-slot.sel { border-color: #60e8ff; animation: inv-pulse 0.9s ease-in-out infinite; }
+.inv-slot.from { border-color: #f0bc40; box-shadow: inset 0 0 14px rgba(240, 188, 64, 0.5); animation: inv-blink 0.4s steps(2) infinite; }
+.inv-slot.sel.from { animation: none; }
+@keyframes inv-pulse {
+  50% { border-color: #c8f8ff; box-shadow: inset 0 0 14px rgba(96, 232, 255, 0.45), 0 0 10px rgba(96, 232, 255, 0.6); }
+}
+@keyframes inv-blink { 50% { border-color: #5a4418; } }
+
+/* action menu, opened next to the selected slot */
+.inv-menu {
+  position: absolute;
+  z-index: 2;
+  min-width: 9.5em;
+  background: #0a0c14;
+  border: 2px solid #e8b53a;
+  box-shadow: 4px 4px 0 #000, 0 0 20px rgba(0, 0, 0, 0.8);
+}
+.inv-opt {
+  display: flex;
+  align-items: center;
+  min-height: clamp(30px, 7vmin, 40px);
+  padding: 0 12px 0 22px;
+  font-size: clamp(18px, 3.8vmin, 28px);
+  letter-spacing: 2px;
+  cursor: pointer;
+  position: relative;
+}
+body.touch .inv-opt { min-height: 44px; }
+.inv-opt.on { background: #6a0818; color: #fff0d0; }
+.inv-opt.on::before { content: '▶'; position: absolute; left: 6px; font-size: 0.7em; color: #f0d080; }
+
+/* rotating 3D view of the selected item */
+.inv-view { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
+.inv-pv {
+  display: block;
+  width: 100%;
+  max-width: calc(var(--slot) * 2.3);
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+}
+.inv-name { font-size: clamp(16px, 3.4vmin, 26px); color: #f0d080; text-align: center; text-shadow: 2px 2px 0 #000; }
+
+.inv-text {
+  min-height: calc(2.2em + var(--g) * 2);
+  font-size: clamp(16px, 3.6vmin, 26px);
+  line-height: 1.1;
+}
+.inv-text.bad { color: #ff7080; }
+.inv-help { text-align: center; font-size: clamp(13px, 2.6vmin, 18px); color: #8a7a68; letter-spacing: 1px; }
+
+/* examine: just the item, big */
+#inv.examining .inv-col,
+#inv.examining .inv-grid { display: none; }
+#inv.examining .inv-body { grid-template-columns: 1fr; }
+#inv.examining .inv-pv { max-width: min(52vh, 70vw); cursor: pointer; }
+
+/* short landscape phones: drop the title and the key hints */
+@media (max-height: 460px) {
+  .inv-head { position: absolute; top: 0; right: 0; z-index: 3; }
+  .inv-head span, .inv-help { display: none; }
+  .inv-view { padding-top: calc(44px + var(--g)); }
+  #inv.examining .inv-view { padding-top: var(--g); }
+}
+@media (orientation: portrait) {
+  .inv-body { grid-template-columns: 1fr; justify-items: center; }
+  .inv-col { flex-direction: row; width: 100%; }
+  .inv-col > * { flex: 1; }
+  .inv-view { width: 100%; }
+  .inv-pv { max-width: calc(var(--slot) * 1.8); }
+}
+
+/* ------------------------------------------------------------------ in-game: pickup prompt, blessing timer, touch button */
+#invPrompt {
+  position: fixed;
+  left: 50%;
+  bottom: 26%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  background: rgba(8, 4, 8, 0.7);
+  border: 1px solid #8a6a3a;
+  font-size: clamp(18px, 3.4vmin, 28px);
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+}
+#invPrompt b {
+  font-weight: normal;
+  color: #f0d080;
+  border: 1px solid #5a4a30;
+  padding: 0 6px;
+  margin-right: 6px;
+  background: #1a1008;
+}
+/* phones: the prompt itself is the button (inventory.js labels it TOQUE), so give it a finger-sized target */
+body.touch #invPrompt { display: flex; align-items: center; min-height: 44px; }
+@media (orientation: portrait) {
+  /* the boss bar sits just above the button fan in portrait; stay clear of it */
+  body.touch #invPrompt { bottom: calc(var(--pad) + var(--sb) + var(--cluster) + 70px); }
+}
+#invBless {
+  position: fixed;
+  left: 50%;
+  /* below the objective line */
+  top: calc(var(--pad, 16px) + var(--st, 0px) + clamp(28px, 5.5vmin, 60px));
+  transform: translateX(-50%);
+  font-size: clamp(16px, 3vmin, 24px);
+  color: #ffd060;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px #ffa020, 2px 2px 0 #000;
+  pointer-events: none;
+}
+#tbInv {
+  top: calc(var(--pad) + var(--st) + var(--map) + 10px);
+  right: calc(var(--pad) + var(--sr));
+}

@@ -1,0 +1,113 @@
+/* campaign: XP bar, level line, save toast, title-screen hunt panel, level-up perk cards */
+
+.bar.xp { height: clamp(4px, 0.55vmin, 7px); width: 64%; }
+#xpFill { background: linear-gradient(#90f0ff, #2a8aa8); width: 0; }
+#lvl { letter-spacing: 1px; }
+
+#toast {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--pad) + var(--st) + clamp(26px, 4.4vmin, 52px));
+  transform: translateX(-50%);
+  font-size: clamp(14px, 1.9vmin, 24px);
+  color: #90f0ff;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+#toast.show { opacity: 1; }
+
+/* ------------------------------------------------------------------ title screen: save slot + difficulty */
+#hunt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.4vh, 12px);
+  margin-bottom: clamp(12px, 3vh, 24px);
+  max-width: min(640px, 100%);
+}
+#hunt .slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: clamp(6px, 1.4vh, 10px) clamp(12px, 2.4vw, 22px);
+  border: 1px solid #5a4a30;
+  background: rgba(26, 16, 8, 0.75);
+  font-size: clamp(16px, min(2.5vw, 4vh), 22px);
+}
+#hunt .slot b { color: #f0d080; font-weight: normal; font-size: 1.15em; }
+#hunt .slot span { color: #c8b8a0; }
+
+#hunt .diffs { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(6px, 1vw, 10px); }
+#hunt .diffs button {
+  font-family: 'VT323', monospace;
+  font-size: clamp(18px, min(2.8vw, 4.4vh), 24px);
+  letter-spacing: 1px;
+  min-height: 44px;
+  padding: 0.1em 0.8em;
+  color: #c8b8a0;
+  background: #1a1008;
+  border: 2px solid #5a4a30;
+  box-shadow: 2px 2px 0 #000;
+}
+#hunt .diffs button[aria-checked='true'] { color: #ffe0c0; background: #6a0818; border-color: #e8b53a; }
+#hunt .diff-desc { font-size: clamp(15px, min(2.3vw, 3.8vh), 20px); color: #a89880; min-height: 2.4em; max-width: 520px; }
+#hunt .warn { font-size: clamp(15px, min(2.3vw, 3.8vh), 19px); color: #ff6070; }
+#hunt .record { font-size: clamp(14px, min(2.1vw, 3.4vh), 18px); color: #60e0ff; }
+#hunt button.link {
+  font-family: 'VT323', monospace;
+  font-size: clamp(17px, min(2.5vw, 4vh), 21px);
+  letter-spacing: 1px;
+  min-height: 44px;
+  padding: 0 12px;
+  color: #f0d080;
+  background: none;
+  border: none;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (hover: hover) {
+  #hunt .diffs button:hover { border-color: #e8b53a; background: #2a1008; }
+  #hunt button.link:hover { background: none; color: #fff0d0; }
+}
+
+/* ------------------------------------------------------------------ level-up */
+#levelup { z-index: 5; background: radial-gradient(ellipse at center, rgba(10, 20, 30, 0.6), rgba(0, 0, 0, 0.88)); }
+#levelup h1 { color: #90f0ff; text-shadow: 4px 4px 0 #00202a, 0 0 30px rgba(80, 220, 255, 0.5); }
+#luHint { font-size: clamp(17px, min(2.6vw, 4.2vh), 24px); color: #c8b8a0; margin-bottom: clamp(10px, 2.5vh, 20px); }
+#perks { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.6vw, 18px); max-width: 100%; }
+#perks .perk {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: clamp(150px, 26vmin, 250px);
+  min-height: 44px;
+  padding: clamp(10px, 2vh, 18px) 12px;
+  font-family: 'VT323', monospace;
+  font-size: clamp(15px, min(2.2vw, 3.6vh), 20px);
+  letter-spacing: 0;
+  line-height: 1.15;
+  color: #e8dcc8;
+  background: rgba(26, 16, 8, 0.9);
+  border: 2px solid #5a4a30;
+  box-shadow: 4px 4px 0 #000;
+  transition: transform 0.08s;
+}
+#perks .perk.sel { border-color: #e8b53a; background: rgba(106, 8, 24, 0.92); transform: translateY(-4px); }
+#perks .perk b { font-family: 'Pirata One', serif; font-weight: normal; font-size: 1.35em; color: #f0d080; }
+.pk-n { position: absolute; top: 4px; left: 8px; color: #8a6a3a; }
+.pk-i { font-size: 2em; line-height: 1; color: #90f0ff; }
+.pk-r { color: #e8b53a; letter-spacing: 2px; font-size: 0.9em; }
+.pk-d { color: #c8b8a0; }
+.lu-keys { margin-top: clamp(10px, 2vh, 18px); font-size: clamp(14px, 2vmin, 18px); color: #8a7a60; }
+@media (hover: hover) {
+  #perks .perk:hover { background: rgba(106, 8, 24, 0.92); }
+}
+@media (orientation: portrait) {
+  #perks { flex-direction: column; align-items: center; }
+  #perks .perk { width: min(86vw, 360px); }
+}

@@ -1,0 +1,403 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* notches / rounded corners / home indicator */
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
+  /* HUD scales with the short side of the screen (values match the original layout at 1080p) */
+  --pad: clamp(10px, 1.9vmin, 20px);
+  --map: clamp(84px, 13vmin, 190px);
+  /* touch controls */
+  --big: clamp(68px, 19vmin, 100px);
+  --small: clamp(46px, 12.5vmin, 66px);
+  --r: calc(var(--big) * 1.45);
+  --cluster: calc(var(--big) / 2 + var(--r) + var(--small) / 2);
+  --stick: clamp(100px, 28vmin, 150px);
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #000;
+  color: #e8dcc8;
+  font-family: 'VT323', monospace;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#game { position: fixed; inset: 0; touch-action: none; }
+#game canvas { display: block; image-rendering: pixelated; }
+
+.hidden { display: none !important; }
+body.touch .desk-only, body:not(.touch) .touch-only { display: none; }
+
+#vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(170, 0, 20, 0.75) 100%);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+
+#tl {
+  position: absolute;
+  left: calc(var(--pad) + var(--sl));
+  top: calc(var(--pad) + var(--st));
+  /* never run under the minimap (or the pause button next to it on touch screens) */
+  max-width: calc(100vw - var(--map) - var(--pad) * 3 - var(--sl) - var(--sr));
+}
+body.touch #tl { max-width: calc(100vw - var(--map) - 44px - var(--pad) * 4 - var(--sl) - var(--sr)); }
+#bars { width: clamp(140px, 24vmin, 360px); }
+.bar {
+  height: clamp(10px, 1.3vmin, 18px);
+  border: 2px solid #1a0a10;
+  outline: 1px solid #8a6a3a;
+  background: #120608;
+  margin-bottom: clamp(5px, 0.75vmin, 10px);
+}
+.bar > div { height: 100%; width: 100%; transition: width 0.12s; }
+#hpFill { background: linear-gradient(#ff4060, #a0102a); }
+#stFill { background: linear-gradient(#f0e060, #a08a20); }
+.bar.st { height: clamp(6px, 0.75vmin, 10px); width: 80%; }
+
+#stats {
+  font-size: clamp(15px, 2.05vmin, 30px);
+  line-height: 1.1;
+  text-shadow: 2px 2px 0 #000;
+}
+#nightLbl { color: #ff6070; }
+
+#minimap {
+  position: absolute;
+  right: calc(var(--pad) + var(--sr));
+  top: calc(var(--pad) + var(--st));
+  width: var(--map);
+  height: var(--map);
+  border-radius: 50%;
+  border: 3px solid #8a6a3a;
+  box-shadow: 0 0 0 2px #1a0a10;
+  image-rendering: pixelated;
+}
+
+#boss {
+  position: absolute;
+  left: 50%;
+  bottom: calc(40px + var(--sb));
+  transform: translateX(-50%);
+  width: 50vw;
+  text-align: center;
+}
+#bossName { font-family: 'Pirata One', serif; font-size: clamp(18px, 2.6vmin, 36px); color: #ff4060; text-shadow: 2px 2px 0 #000; }
+#boss .bar { height: clamp(8px, 1.1vmin, 16px); }
+#bossFill { background: linear-gradient(#c040ff, #5a0a8a); }
+/* keep the boss bar between the stick and the buttons (or above them in portrait) */
+body.touch #boss { width: min(38vw, 420px); bottom: calc(var(--pad) + var(--sb)); }
+
+#msg {
+  position: absolute;
+  top: 28%;
+  left: 0;
+  right: 0;
+  padding: 0 16px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.8s;
+  text-shadow: 3px 3px 0 #000;
+}
+#msg.show { opacity: 1; }
+#msgTitle { font-family: 'Pirata One', serif; font-size: clamp(34px, 6.7vmin, 96px); color: #ff3050; letter-spacing: 4px; }
+#msgSub { font-size: clamp(17px, 2.6vmin, 36px); color: #e8dcc8; }
+
+/* ------------------------------------------------------------------ touch controls */
+#touch { position: fixed; inset: 0; touch-action: none; }
+
+#stick {
+  position: absolute;
+  left: calc(var(--sl) + var(--pad) + 5vmin);
+  bottom: calc(var(--sb) + var(--pad) + 5vmin);
+  width: var(--stick);
+  height: var(--stick);
+  border-radius: 50%;
+  border: 2px solid rgba(232, 181, 58, 0.45);
+  background: radial-gradient(circle, rgba(20, 8, 12, 0.15), rgba(20, 8, 12, 0.55));
+  opacity: 0.45;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+#stick.active { opacity: 0.9; transition: none; }
+#knob {
+  position: absolute;
+  inset: 28%;
+  border-radius: 50%;
+  border: 2px solid #e8b53a;
+  background: rgba(232, 181, 58, 0.5);
+}
+
+.tb {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: var(--small);
+  height: var(--small);
+  border-radius: 50%;
+  border: 2px solid rgba(232, 181, 58, 0.55);
+  background: rgba(20, 8, 12, 0.5);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  color: #f0d080;
+}
+.tb svg { width: 44%; height: 44%; }
+.tb small { font-size: clamp(11px, 2.4vmin, 14px); line-height: 1; letter-spacing: 0.5px; }
+.tb.down, .tb.on { background: rgba(160, 16, 42, 0.8); border-color: #e8b53a; color: #fff0d0; }
+.tb.off { opacity: 0.4; }
+
+#cluster {
+  position: absolute;
+  right: calc(var(--pad) + var(--sr) + 4px);
+  bottom: calc(var(--pad) + var(--sb) + 4px);
+  width: var(--big);
+  height: var(--big);
+}
+/* small buttons fan out around the sword button (unit direction in --dx/--dy) */
+#cluster .tb {
+  left: 50%;
+  top: 50%;
+  margin: calc(var(--small) / -2) 0 0 calc(var(--small) / -2);
+  transform: translate(calc(var(--dx) * var(--r)), calc(var(--dy) * var(--r)));
+}
+#cluster .tb.big {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  transform: none;
+  border-width: 3px;
+  background: rgba(106, 8, 24, 0.6);
+}
+#cluster .tb.big.down { background: rgba(200, 20, 50, 0.85); }
+.tb.big svg { width: 50%; height: 50%; }
+
+/* outer corner of the crossbow button, away from its neighbours in the fan */
+#ammo {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 1px solid #e8b53a;
+  background: #1a0a10;
+  color: #fff;
+  font-weight: normal;
+  font-size: 16px;
+  line-height: 18px;
+}
+
+#tbPause {
+  top: calc(var(--pad) + var(--st));
+  right: calc(var(--pad) * 2 + var(--sr) + var(--map));
+  width: 44px;
+  height: 44px;
+}
+
+@media (orientation: portrait) {
+  body.touch #boss { width: 72vw; bottom: calc(var(--pad) + var(--sb) + var(--cluster) + 16px); }
+}
+
+/* ------------------------------------------------------------------ menus */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  touch-action: pan-y;
+  text-align: center;
+  padding: max(16px, var(--st)) max(16px, var(--sr)) max(16px, var(--sb)) max(16px, var(--sl));
+  background: radial-gradient(ellipse at center, rgba(20, 0, 10, 0.55), rgba(0, 0, 0, 0.9));
+}
+/* auto margins center the content, but it still scrolls from the top when the screen is too short */
+.overlay > * { flex-shrink: 0; }
+.overlay > :first-child { margin-top: auto; }
+.overlay > :last-child { margin-bottom: auto; }
+.overlay h1 {
+  font-family: 'Pirata One', serif;
+  font-size: clamp(40px, min(10vw, 16vh), 120px);
+  line-height: 1.1;
+  color: #e0203a;
+  text-shadow: 4px 4px 0 #2a0008, 0 0 30px rgba(255, 30, 60, 0.5);
+  letter-spacing: 4px;
+}
+.overlay h2 {
+  font-size: clamp(18px, min(4vw, 5.5vh), 32px);
+  color: #60e0ff;
+  margin-bottom: clamp(8px, 2.5vh, 18px);
+  letter-spacing: clamp(2px, 0.6vw, 6px);
+}
+.lore { max-width: 640px; font-size: clamp(16px, min(2.6vw, 4.2vh), 22px); color: #c8b8a0; margin-bottom: clamp(10px, 2.5vh, 20px); }
+.controls { font-size: clamp(15px, min(2.3vw, 3.8vh), 20px); color: #a89880; margin-bottom: clamp(12px, 3.5vh, 28px); line-height: 1.6; }
+.controls span { color: #f0d080; border: 1px solid #5a4a30; padding: 0 6px; background: #1a1008; white-space: nowrap; }
+.rotate-hint { display: none; font-size: clamp(16px, 4vw, 20px); color: #60e0ff; margin-bottom: 16px; }
+@media (orientation: portrait) {
+  body.touch .rotate-hint { display: block; }
+}
+.menu-intro, .menu-actions { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+/* wide but short screens (phones on their side, tablets, 720p laptops): intro left, hunt panel + buttons right */
+@media (min-aspect-ratio: 5/4) and (max-height: 820px) {
+  #menu { flex-direction: row; justify-content: center; gap: 4vw; }
+  #menu > * { flex: 0 1 46vw; margin: auto 0; }
+  #menu h1 { font-size: clamp(36px, min(6vw, 13vh), 110px); }
+}
+@media (min-aspect-ratio: 5/4) and (max-height: 440px) {
+  #menu .lore { display: none; }
+}
+#deadStats { font-size: clamp(18px, min(3vw, 5vh), 26px); margin: clamp(6px, 1.5vh, 10px) 0 clamp(14px, 4vh, 26px); }
+
+button {
+  font-family: 'Pirata One', serif;
+  font-size: clamp(24px, min(5vw, 7vh), 34px);
+  padding: 0.24em 1.2em;
+  color: #ffe0c0;
+  background: #6a0818;
+  border: 3px solid #e8b53a;
+  cursor: pointer;
+  letter-spacing: 3px;
+  box-shadow: 4px 4px 0 #000;
+  touch-action: manipulation;
+}
+button:active { background: #a0102a; }
+@media (hover: hover) {
+  button:hover { background: #a0102a; }
+}
+
+/* ------------------------------------------------------------------ objective + victory */
+#objective {
+  position: fixed; /* lives inside #tl, but centred on the screen */
+  top: calc(var(--pad) + var(--st));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(46vw, 560px);
+  text-align: center;
+  font-size: clamp(14px, 2vmin, 26px);
+  color: #f0d080;
+  text-shadow: 2px 2px 0 #000;
+  padding: 2px 10px;
+  border-bottom: 1px solid rgba(232, 181, 58, 0.45);
+  background: linear-gradient(transparent, rgba(20, 8, 12, 0.45));
+}
+#objective:empty { display: none; }
+/* portrait has no room between the bars and the minimap: list it under the stats instead */
+@media (orientation: portrait) {
+  #objective { position: static; transform: none; max-width: none; margin-top: 4px; padding: 2px 0; text-align: left; }
+}
+#winStats { font-size: clamp(18px, 3vmin, 26px); margin: 10px 0 26px; }
+#win h1 { color: #f0bc40; text-shadow: 4px 4px 0 #3a1a00, 0 0 30px rgba(255, 200, 60, 0.5); }
+
+/* ------------------------------------------------------------------ settings panel */
+button.secondary {
+  margin-top: clamp(10px, 2vh, 16px);
+  font-size: clamp(18px, min(3.4vw, 4.6vh), 24px);
+  background: #1a1008;
+  border-width: 2px;
+}
+button.secondary:active { background: #3a1a10; }
+.credits { margin-top: clamp(10px, 2vh, 16px); font-size: clamp(14px, min(2vw, 3.2vh), 18px); color: #8a7a64; }
+.credits a { color: #c8a860; }
+@media (hover: hover) {
+  button.secondary:hover { background: #3a1a10; }
+}
+
+/* side panel: the game keeps rendering beside it, so every filter is previewed live */
+#settings {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  width: min(390px, 100vw);
+  display: flex;
+  flex-direction: column;
+  padding: max(14px, var(--st)) max(16px, var(--sr)) max(14px, var(--sb)) 16px;
+  background: rgba(12, 4, 8, 0.86);
+  border-left: 3px solid #8a6a3a;
+  box-shadow: -4px 0 0 #000;
+  font-size: 19px;
+  color: #e8dcc8;
+}
+#settings h3 {
+  font-family: 'Pirata One', serif;
+  font-size: 34px;
+  color: #e0203a;
+  text-shadow: 3px 3px 0 #2a0008;
+  letter-spacing: 2px;
+}
+#settings h4 {
+  font-family: 'Pirata One', serif;
+  font-size: 22px;
+  font-weight: normal;
+  color: #60e0ff;
+  letter-spacing: 2px;
+  margin: 14px 0 4px;
+  border-bottom: 1px solid #3a2a1a;
+}
+.set-body { flex: 1; overflow-y: auto; touch-action: pan-y; padding-right: 6px; margin: 6px 0 12px; }
+.set-row {
+  display: grid;
+  grid-template-columns: 9.2em 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.set-row > :last-child:nth-child(2) { grid-column: span 2; }
+.set-row.off { opacity: 0.4; }
+#settings select {
+  width: 100%;
+  font: inherit;
+  font-size: 18px;
+  color: #f0d080;
+  background: #1a1008;
+  border: 1px solid #5a4a30;
+  padding: 1px 4px;
+}
+#settings option { background: #1a1008; }
+#settings input[type='range'] { width: 100%; accent-color: #e0203a; }
+#settings output { min-width: 3em; text-align: right; color: #f0d080; }
+#settings :focus-visible { outline: 2px solid #60e0ff; outline-offset: 1px; }
+.set-info { display: block; text-align: right; color: #a89880; font-size: 16px; }
+input.switch {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 22px;
+  border: 2px solid #5a4a30;
+  background: #1a1008;
+  cursor: pointer;
+}
+input.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #5a4a30;
+  transition: transform 0.12s;
+}
+input.switch:checked { border-color: #e8b53a; background: #6a0818; }
+input.switch:checked::after { transform: translateX(22px); background: #f0d080; }
+.set-foot { display: flex; gap: 12px; }
+.set-foot button { flex: 1; font-size: 22px; padding: 0.15em 0.4em; }
