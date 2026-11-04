@@ -74,6 +74,8 @@ Funciona de celulares pequenos (iPhone SE) a monitores ultrawide, em paisagem ou
 
 Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisagem). Se o app for para segundo plano, o jogo pausa. Usar mouse/teclado ou toque no meio da partida troca o esquema de controle automaticamente.
 
+**Instalar como app e jogar offline:** o site é um PWA. No Android/Chrome, use "Instalar app" (ou "Adicionar à tela inicial"); no iPhone, Compartilhar → "Adicionar à Tela de Início"; no computador, o ícone de instalar na barra de endereço. Depois da primeira visita o jogo abre sem internet. Os ícones são desenhados por código em [`scripts/make-icons.mjs`](scripts/make-icons.mjs) (`npm run icons` regrava `public/*.png`) e o `dist/sw.js` é gerado no build pelo plugin em [`vite.config.js`](vite.config.js), com a lista exata de arquivos e um nome de cache que muda a cada versão (páginas: rede primeiro; arquivos: cache primeiro).
+
 ## Combate
 
 - **Aviso de golpe:** quando uma criatura começa um ataque, o corpo pisca em vermelho e um brilho vermelho acende nos olhos até o golpe cair (além do som de aviso). O lobisomem se agacha antes do salto e pula para onde você estava no fim do agachamento.

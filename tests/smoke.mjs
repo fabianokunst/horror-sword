@@ -37,6 +37,34 @@ async function buildSnapshot() {
   await build({ root: ROOT, logLevel: 'error', build: { outDir: OUT, emptyOutDir: true, chunkSizeWarningLimit: 4000 } });
 }
 
+// the real production build (service worker, manifest) for the install/offline check
+async function buildProd(dir) {
+  process.env.NODE_ENV = 'production';
+  const { build } = await import('vite');
+  await build({ root: ROOT, logLevel: 'error', build: { outDir: dir, emptyOutDir: true, chunkSizeWarningLimit: 4000 } });
+}
+
+async function offline(browser, url, dir, errors) {
+  const sw = fs.existsSync(path.join(dir, 'sw.js')) ? fs.readFileSync(path.join(dir, 'sw.js'), 'utf8') : '';
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.webmanifest'), 'utf8'));
+  const icons = manifest.icons.every((i) => fs.existsSync(path.join(dir, i.src)));
+  check('production build: service worker precaches the bundle, manifest icons exist', /assets\/index-[\w-]+\.js/.test(sw) && icons && manifest.icons.length >= 3);
+  const page = await browser.newPage();
+  page.on('pageerror', (e) => errors.push('offline: ' + e.message));
+  await page.goto(url);
+  const ready = await page.evaluate(() => Promise.race([
+    navigator.serviceWorker.ready.then(() => true),
+    new Promise((r) => setTimeout(() => r(false), 30000)),
+  ]));
+  await page.reload();
+  await page.setOfflineMode(true);
+  await page.reload();
+  const loaded = await page.waitForFunction(() => document.getElementById('play') && document.querySelector('#game canvas'), { timeout: 60000 }).then(() => true, () => false);
+  await page.setOfflineMode(false);
+  check('production build opens offline (service worker)', ready && loaded, { ready, loaded });
+  await page.close();
+}
+
 function serve(dir) {
   const types = {
     '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff',
@@ -404,14 +432,17 @@ async function touch(browser, url, errors) {
 }
 
 const deadline = setTimeout(() => { console.error('FAIL  smoke test took longer than 12 minutes'); process.exit(1); }, 12 * 60000);
-let server, browser;
+let server, prodServer, browser;
 const errors = [];
+const PROD = fs.mkdtempSync(path.join(os.tmpdir(), 'hs-smoke-prod-'));
 try {
   const exe = chromePath();
   if (!exe) throw new Error('no Chrome/Chromium found: set CHROME_PATH');
+  await buildProd(PROD);
   await buildSnapshot();
   check('development build', fs.existsSync(path.join(OUT, 'index.html')));
   server = await serve(OUT);
+  prodServer = await serve(PROD);
   const url = `http://127.0.0.1:${server.address().port}/`;
   browser = await puppeteer.launch({
     executablePath: exe, headless: true, pipe: true,
@@ -421,13 +452,16 @@ try {
   await desktop(browser, url, errors);
   await gamepad(browser, url, errors);
   await touch(browser, url, errors);
+  await offline(browser, `http://127.0.0.1:${prodServer.address().port}/`, PROD, errors);
 } catch (e) {
   check('smoke test ran to the end', false, e.stack || String(e));
 } finally {
   check('no page errors', errors.length === 0, errors.length ? errors.slice(0, 5) : '');
   await browser?.close().catch(() => {});
   server?.close();
+  prodServer?.close();
   fs.rmSync(OUT, { recursive: true, force: true });
+  fs.rmSync(PROD, { recursive: true, force: true });
   clearTimeout(deadline);
 }
 console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');
