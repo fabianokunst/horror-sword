@@ -12,9 +12,17 @@ npm run build    # gera dist/
 
 O jogo precisa do build: abrir o `index.html` da raiz direto (ou servir a raiz do repositório) não funciona, porque ele aponta para `src/` e importa `three` do `node_modules`.
 
+### Teste automático
+
+```bash
+npm test         # ~30 s: monta uma cópia de desenvolvimento, joga no Chrome sem janela e confere o básico
+```
+
+[`tests/smoke.mjs`](tests/smoke.mjs) gera um build de desenvolvimento numa pasta temporária (mantém o gancho `window.__hs`), serve numa porta livre e joga no Chrome instalado (variável `CHROME_PATH` para escolher outro). Falha se houver qualquer erro na página ou se quebrar: início da caçada, vez de atacar, aviso de golpe, esquiva perfeita e contra-ataque, trava de alvo, colisão da câmera, criaturas contornando uma casa e o layout dos botões de toque. Como usa pasta e porta próprias, várias sessões podem rodar ao mesmo tempo.
+
 ### Publicar (GitHub Pages)
 
-Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que faz o build e publica o `dist/` em https://fabianokunst.github.io/horror-sword/. O `vite.config.js` usa `base: './'`, então o build funciona em qualquer subcaminho. Em **Settings → Pages → Build and deployment → Source** precisa estar **GitHub Actions** (com "Deploy from a branch" o Pages serve o código-fonte cru: tela sem CSS e jogo parado).
+Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que faz o build, roda o `npm test` e só então publica o `dist/` em https://fabianokunst.github.io/horror-sword/. Se o teste falhar, o site continua na versão anterior. Pull requests rodam build e teste, sem publicar. O `vite.config.js` usa `base: './'`, então o build funciona em qualquer subcaminho. Em **Settings → Pages → Build and deployment → Source** precisa estar **GitHub Actions** (com "Deploy from a branch" o Pages serve o código-fonte cru: tela sem CSS e jogo parado).
 
 ## Controles
 
@@ -119,4 +127,4 @@ Não há nenhum arquivo de áudio: efeitos, ambiente e trilha são gerados pela 
 
 ## Licenças
 
-Tudo o que o jogo usa é livre e redistribuível: three.js e simplex-noise (MIT) e as fontes Pirata One e VT323 (SIL OFL 1.1). As fontes são embutidas no build via `@fontsource` e não carregadas do Google Fonts, então o jogo não envia o IP do jogador a terceiros (exigência da LGPD/GDPR). O texto completo das licenças fica em [`public/THIRD-PARTY-NOTICES.txt`](public/THIRD-PARTY-NOTICES.txt), é copiado para `dist/` e tem link no menu. Ao adicionar uma dependência, fonte ou asset, use apenas licenças abertas e acrescente o aviso nesse arquivo.
+Tudo o que o jogo usa é livre e redistribuível: three.js e simplex-noise (MIT) e as fontes Pirata One e VT323 (SIL OFL 1.1). As fontes são embutidas no build via `@fontsource` e não carregadas do Google Fonts, então o jogo não envia o IP do jogador a terceiros (exigência da LGPD/GDPR). O texto completo das licenças fica em [`public/THIRD-PARTY-NOTICES.txt`](public/THIRD-PARTY-NOTICES.txt), é copiado para `dist/` e tem link no menu. Ao adicionar uma dependência, fonte ou asset, use apenas licenças abertas e acrescente o aviso nesse arquivo. Ferramentas só de desenvolvimento (Vite, MIT; puppeteer-core, Apache-2.0, usado pelo `npm test`) não vão para o build publicado.

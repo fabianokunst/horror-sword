@@ -1,4 +1,5 @@
-# Builds the game with Vite and publishes dist/ to GitHub Pages on every push to main.
+# Builds the game, plays it headless (tests/smoke.mjs) and, only if that passes, publishes dist/ to GitHub Pages
+# on every push to main. Pull requests run the same build + test without deploying.
 # Repo setting required once: Settings → Pages → Build and deployment → Source: "GitHub Actions".
 # (With "Deploy from a branch" Pages serves the raw source, which cannot run: no CSS, no three.js.)
 name: Deploy to GitHub Pages
@@ -6,6 +7,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -13,8 +15,9 @@ permissions:
   pages: write
   id-token: write
 
+# one deploy at a time; pull requests get their own group so they never cancel a deploy
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('test-{0}', github.ref) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
@@ -28,11 +31,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # headless Chrome (preinstalled on the runner) plays a development snapshot: a broken game never ships
+      - run: npm test
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
