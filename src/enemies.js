@@ -4,6 +4,7 @@ import { makeModel, FLASH_MAT } from './characters.js';
 import { heightAt, groundAt, WATER } from './world.js';
 import { basic, glowSprite } from './ps1.js';
 import { sfx } from './audio.js';
+import { NavGrid } from './nav.js';
 
 export const TYPES = {
   ghoul: { model: () => 'ghoul', hp: 3, speed: 3.6, dmg: 10, range: 1.5, windup: 0.4, blood: 0x7cff3a, souls: 1, radius: 0.5 },
@@ -26,6 +27,8 @@ const TELL_FLASH = 0.09;
 const CROUCH = 0.35; // werewolves crouch this long before pouncing
 // A roll that starts this close to the moment a blow lands is a perfect dodge (see strike()).
 const PERFECT = 0.25;
+// mist-blink: angles tried around "right behind the hunter", nearest first
+const BLINK_OFFSETS = [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8, 2.4, -2.4];
 
 // roaming creatures when no campaign chapter is driving the spawns
 const DEFAULT_SPAWN = { max: 8, interval: 2.6, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul', 'wolf'] };
@@ -59,6 +62,8 @@ export class Enemies {
     // < 1 slows the creatures only (the slow motion after a perfect dodge); bolts and souls keep full speed
     this.timeScale = 1;
     this.clock = 0;
+    this.nav = null; // ground navigation around the hunter (nav.js), built on the first update
+    this.flowDir = { x: 0, z: 0 };
   }
 
   // Scales a fresh creature to the current chapter; some come back as glowing elites.
@@ -117,6 +122,7 @@ export class Enemies {
       kx: 0, kz: 0, facing: 0, phase: Math.random() * 10, cd: 1, atk: -1, struck: false,
       stun: 0, flash: 0, dying: 0, blinkCd: 2 + Math.random() * 4, leapCd: 2, leap: null, crouch: 0,
       burn: 0, speedMul: 0.85 + Math.random() * 0.3, tell: 0, side: Math.random() < 0.5 ? 1 : -1,
+      navT: Math.random() * 0.15, hidden: false, pathing: false, // line-of-sight check timer / result
     };
     // the eye glint, parented to the head (bats: the body) so it follows the animation
     e.glint = glowSprite(0xff3a1a, 1, 0.95);
@@ -221,6 +227,19 @@ export class Enemies {
     if (inReach && player.hurt(e.dmg, e.pos.x, e.pos.z)) this.onPlayerHit?.(e.dmg);
   }
 
+  // Where a vampire reappears: behind the hunter if that is open ground with nothing in between,
+  // otherwise the closest free spot toward the flanks (a wall at the hunter's back sends it to the side).
+  blinkSpot(player) {
+    const nav = this.nav, p = player.pos;
+    const base = player.facing + Math.PI + (Math.random() - 0.5) * 0.6, flip = Math.random() < 0.5 ? 1 : -1;
+    for (const o of BLINK_OFFSETS) {
+      const a = base + o * flip;
+      const x = p.x + Math.sin(a) * 3.2, z = p.z + Math.cos(a) * 3.2;
+      if (!nav || (!nav.blockedAt(x, z) && nav.los(x, z, p.x, p.z))) return { x, z };
+    }
+    return null;
+  }
+
   // --- per frame
   update(dt, ctx) {
     const { player, dayAmt, world, spawn: S = DEFAULT_SPAWN } = ctx;
@@ -230,6 +249,9 @@ export class Enemies {
     dt *= this.timeScale; // creatures (and their spawning) live in the slowed time
     this.clock += dt;
     const time = this.clock;
+    // flow field toward the hunter for the walkers, rebuilt as the hunter moves
+    if (world && !this.nav) this.nav = new NavGrid(world);
+    this.nav?.update(realDt, player.pos.x, player.pos.z);
 
     // spawning: the campaign chapter decides who roams, how many and how often
     this.spawnTimer -= dt;
@@ -364,6 +386,7 @@ export class Enemies {
     const free = T.boss || this.attackers < this.mods.attackers;
     let speed = 0;
     let mx = 0, mz = 0;
+    e.pathing = false; // walking around an obstacle this frame (set in the chase below)
     if (e.stun > 0) {
       e.stun -= dt;
     } else if (e.crouch > 0) {
@@ -405,8 +428,21 @@ export class Enemies {
       speed = T.speed * e.speedMul;
       mx = dx / dist;
       mz = dz / dist;
+      // walkers with a house, a wall or a fence between them and the hunter follow the flow field around it
+      if (!T.fly && this.nav) {
+        if ((e.navT -= dt) <= 0) {
+          e.navT = 0.15;
+          e.hidden = !this.nav.los(pos.x, pos.z, player.pos.x, player.pos.z);
+        }
+        const f = e.hidden && this.nav.flow(pos.x, pos.z, this.flowDir);
+        if (f) {
+          mx = f.x;
+          mz = f.z;
+          e.pathing = true;
+        }
+      }
       // no free slot and already close: circle the hunter at the edge of the fight and wait for a turn
-      const wait = !free && !player.dead && dist < T.range + (T.fly ? 6 : 3.4) * sc;
+      const wait = !free && !player.dead && !e.pathing && dist < T.range + (T.fly ? 6 : 3.4) * sc;
       if (T.fly && dist > 7 && !wait) {
         // circle around the player before swooping in
         const side = Math.sin(time * 0.8 + e.phase) > 0 ? 1 : -1;
@@ -431,18 +467,23 @@ export class Enemies {
       }
       // vampires dissolve into mist and reappear behind the hunter
       if (T.blink && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
-        this.fx.burst(pos.clone().setY(pos.y + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
-        const a = player.facing + Math.PI + (Math.random() - 0.5) * 1.4;
-        pos.x = player.pos.x + Math.sin(a) * 3.2;
-        pos.z = player.pos.z + Math.cos(a) * 3.2;
-        this.fx.burst(pos.clone().setY(groundAt(pos.x, pos.z) + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
-        e.blinkCd = T.blink + Math.random() * 4;
-        e.cd = 0.35;
-        sfx.blink(pos);
-        // the count summons bats when he blinks
-        if (T.boss) for (let i = 0; i < 3; i++) this.spawn('bat', pos.x, pos.z, 4, 8);
+        const spot = this.blinkSpot(player);
+        if (!spot) e.blinkCd = 1; // walls all around the hunter's back: try again in a moment
+        else {
+          this.fx.burst(pos.clone().setY(pos.y + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
+          pos.x = spot.x;
+          pos.z = spot.z;
+          this.fx.burst(pos.clone().setY(groundAt(pos.x, pos.z) + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
+          e.blinkCd = T.blink + Math.random() * 4;
+          e.cd = 0.35;
+          e.hidden = false;
+          sfx.blink(pos);
+          // the count summons bats when he blinks
+          if (T.boss) for (let i = 0; i < 3; i++) this.spawn('bat', pos.x, pos.z, 4, 8);
+        }
       }
-      if (T.leap && (e.leapCd -= dt) <= 0 && free && dist > 4 && dist < 11 && !player.dead) {
+      // a pounce needs a clear line: no jumping through walls
+      if (T.leap && (e.leapCd -= dt) <= 0 && free && !e.hidden && dist > 4 && dist < 11 && !player.dead) {
         e.crouch = CROUCH;
         e.tell = TELL_FLASH;
         e.leapCd = 3 + Math.random() * 2;
@@ -466,8 +507,8 @@ export class Enemies {
       pos.y += (ty - pos.y) * Math.min(1, dt * 4);
     } else pos.y = g + (e.leapY || 0);
 
-    // --- animation
-    const target = Math.atan2(dx, dz);
+    // --- animation (walking around an obstacle: face the way it walks, not the hunter through the wall)
+    const target = e.pathing ? Math.atan2(mx, mz) : Math.atan2(dx, dz);
     e.facing = lerpAngle(e.facing, target, 1 - Math.exp(-10 * dt));
     e.phase += (speed + 1) * dt * 1.6;
     const sw = Math.sin(e.phase) * Math.min(1, speed / 4);

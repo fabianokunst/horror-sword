@@ -54,6 +54,7 @@ Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisa
 - **Aviso de golpe:** quando uma criatura começa um ataque, o corpo pisca em vermelho e um brilho vermelho acende nos olhos até o golpe cair (além do som de aviso). O lobisomem se agacha antes do salto e pula para onde você estava no fim do agachamento.
 - **Vez de atacar:** só algumas criaturas atacam ao mesmo tempo; as outras rondam em volta esperando a vez. Peregrino 2, Caçador 3, Van Helsing 3, Pesadelo 4, e +1 por ciclo de novo jogo+ (até +2). Chefes não esperam.
 - **Esquiva perfeita:** esquivar no último instante antes do golpe (até 0,25 s antes) deixa as criaturas em câmera lenta por ~1 s (a imagem esfria), devolve stamina e abre uma janela de contra-ataque em que a espada causa 1,75× de dano.
+- **Caminhos:** criaturas a pé que não enxergam o caçador (uma casa, um muro, a cerca do cemitério no caminho) dão a volta pelo obstáculo em vez de empacar nele. O lobisomem só salta com o caminho livre, e o vampiro reaparece em chão aberto atrás de você ou, com uma parede às suas costas, pelos lados. Morcegos e noivas voam por cima de tudo.
 - **Travar alvo:** R (ALVO no toque) trava a criatura para onde a câmera aponta ou a mais próxima. A câmera acompanha, o caçador fica de frente para ela ao andar (correr quebra) e espada e besta miram nela. Quando ela morre, a trava passa para a criatura mais próxima; longe demais (34 m), solta.
 
 ## Campanha
@@ -94,6 +95,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/models.js` — primitivas (caixa, cilindro, frontão) e `bake()` para construções e acessórios.
 - `src/player.js` — movimento, combo, esquiva, besta; atributos vindos dos dons (`applyStats`) e cor do título (`setRank`).
 - `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
+- `src/nav.js` — navegação das criaturas a pé: grade de 1 m numa janela de 112 m em volta do caçador, desenhada a partir dos círculos de colisão do mundo (refeita a cada 2 m andados ou 1 s), teste de linha de visão e campo de fluxo (Dijkstra em 8 direções) calculado só quando alguma criatura perde o caçador de vista.
 - `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
 - `src/camcollide.js` — colisão da câmera: um raio por quadro da cabeça do caçador até a câmera, contra as construções (malhas grandes como o castelo são divididas em pedaços de 6 m para o raio testar só os triângulos próximos) e o relevo. Paredes e telhados puxam a câmera na hora; ela volta suave quando o caminho abre; colada demais, o caçador some para não tapar a tela. Árvores ficam de fora de propósito (a câmera ficaria entrando e saindo nas florestas).
 - `src/campaign.js` — capítulos e objetivos, escala por capítulo/ciclo, XP e level-up, checkpoints, morte por dificuldade e novo jogo+.
