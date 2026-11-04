@@ -5,6 +5,7 @@ import {
   DIFFICULTIES, PERKS, computeStats, rankOf, addXp, xpToNext, rollPerks,
   newSave, writeSave, clearSave, cloneSave, updateRecords,
 } from './progress.js';
+import { L } from './i18n.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 export const roman = (n) => ROMAN[n - 1] || String(n);
@@ -13,35 +14,35 @@ export const roman = (n) => ROMAN[n - 1] || String(n);
 // creatures, more elites and every creature type roaming (see applyScaling / spawnConfig).
 export const CHAPTERS = [
   {
-    title: 'A Primeira Noite', intro: 'O sol se põe sobre a Transilvânia...',
+    title: L('A Primeira Noite', 'The First Night'), intro: L('O sol se põe sobre a Transilvânia...', 'The sun sets over Transylvania...'),
     goal: { kind: 'survive' },
     density: 6, night: ['ghoul', 'ghoul', 'ghoul', 'bat'], day: ['ghoul'],
   },
   {
-    title: 'O Cemitério', intro: 'Algo dorme sob as lápides.',
-    goal: { kind: 'coffin', id: 'cemetery', place: 'do Cemitério' },
+    title: L('O Cemitério', 'The Cemetery'), intro: L('Algo dorme sob as lápides.', 'Something sleeps beneath the headstones.'),
+    goal: { kind: 'coffin', id: 'cemetery', place: L('do Cemitério', 'in the Cemetery') },
     guards: [{ type: 'vampire', n: 2 }, { type: 'ghoul', n: 4 }],
     density: 8, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul'],
   },
   {
-    title: 'Uivos no Moinho', intro: 'A matilha protege o seu senhor.',
-    goal: { kind: 'coffin', id: 'windmill', place: 'do Moinho' },
-    guards: [{ type: 'wolf', n: 1, name: 'LOBO ALFA', hp: 6, scale: 1.5 }, { type: 'wolf', n: 3 }],
+    title: L('Uivos no Moinho', 'Howls at the Mill'), intro: L('A matilha protege o seu senhor.', 'The pack guards its master.'),
+    goal: { kind: 'coffin', id: 'windmill', place: L('do Moinho', 'at the Mill') },
+    guards: [{ type: 'wolf', n: 1, name: L('LOBO ALFA', 'ALPHA WOLF'), hp: 6, scale: 1.5 }, { type: 'wolf', n: 3 }],
     density: 10, night: ['wolf', 'wolf', 'ghoul', 'ghoul', 'vampire', 'bat', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
-    title: 'As Noivas da Abadia', intro: 'Três vozes cantam entre as ruínas.',
-    goal: { kind: 'coffin', id: 'abbey', place: 'da Abadia' },
-    guards: [{ type: 'bride', n: 3, name: 'NOIVA DO CONDE', hp: 3, scale: 1.15, shade: true }],
+    title: L('As Noivas da Abadia', 'The Brides of the Abbey'), intro: L('Três vozes cantam entre as ruínas.', 'Three voices sing among the ruins.'),
+    goal: { kind: 'coffin', id: 'abbey', place: L('da Abadia', 'in the Abbey') },
+    guards: [{ type: 'bride', n: 3, name: L('NOIVA DO CONDE', "THE COUNT'S BRIDE"), hp: 3, scale: 1.15, shade: true }],
     density: 11, night: ['bride', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'ghoul', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
-    title: 'Lua de Sangue', intro: 'O selo do castelo se alimenta de sangue.',
+    title: L('Lua de Sangue', 'Blood Moon'), intro: L('O selo do castelo se alimenta de sangue.', "The castle's seal feeds on blood."),
     goal: { kind: 'kills', n: 30, night: true }, bloodMoon: true, gate: true,
     density: 14, night: ['ghoul', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'wolf', 'bride', 'witch'], day: ['ghoul', 'wolf', 'wolf'],
   },
   {
-    title: 'O Conde Drácula', intro: 'O portão está aberto. Ele espera por você.',
+    title: L('O Conde Drácula', 'Count Dracula'), intro: L('O portão está aberto. Ele espera por você.', 'The gate is open. He is waiting for you.'),
     goal: { kind: 'boss' }, bloodMoon: true,
     density: 9, night: ['vampire', 'vampire', 'bat', 'bat', 'bride', 'witch'], day: ['ghoul', 'wolf'],
   },
@@ -73,7 +74,7 @@ export class Campaign {
     world.onCoffinDestroyed = (c) => this.coffinDestroyed(c);
     world.onCoffinSealed = () => {
       sfx.deny();
-      hud.toast('✝ Selado por magia antiga — ainda não é a hora deste caixão');
+      hud.toast(L('✝ Selado por magia antiga — ainda não é a hora deste caixão', '✝ Sealed by old magic — this coffin’s time has not come'));
     };
   }
 
@@ -82,7 +83,7 @@ export class Campaign {
   get bloodMoon() { return !!this.chapter.bloodMoon; }
   get tag() {
     const c = this.save.cycle;
-    return `${c ? `CICLO ${roman(c + 1)} · ` : ''}CAP. ${roman(this.save.chapter + 1)}`;
+    return `${c ? `${L('CICLO', 'CYCLE')} ${roman(c + 1)} · ` : ''}${L('CAP.', 'CH.')} ${roman(this.save.chapter + 1)}`;
   }
   get hunter() {
     const s = this.save;
@@ -112,7 +113,7 @@ export class Campaign {
     this.freshInv ??= this.inv?.save?.();
     this.inv?.load?.(save.inventory || this.freshInv);
     if (!save.savedAt) this.checkpoint(false); // a brand-new hunt is saved right away
-    if (save.cycle > 0 && save.chapter === 0) this.hud.message(`CICLO ${roman(save.cycle + 1)}`, 'As criaturas retornam mais fortes...', 4);
+    if (save.cycle > 0 && save.chapter === 0) this.hud.message(`${L('CICLO', 'CYCLE')} ${roman(save.cycle + 1)}`, L('As criaturas retornam mais fortes...', 'The creatures return stronger...'), 4);
     this.announce();
     return this.dayT;
   }
@@ -174,7 +175,7 @@ export class Campaign {
 
   announce() {
     const ch = this.chapter;
-    this.hud.message(`CAPÍTULO ${roman(this.save.chapter + 1)}`, `${ch.title} — ${ch.intro}`, 5);
+    this.hud.message(`${L('CAPÍTULO', 'CHAPTER')} ${roman(this.save.chapter + 1)}`, `${ch.title} — ${ch.intro}`, 5);
   }
 
   objective() {
@@ -182,17 +183,17 @@ export class Campaign {
     const m = (o) => `${Math.round(dist(o, p))}m`;
     switch (t.kind) {
       case 'survive':
-        return { text: this.isNight ? '☾ Sobreviva até o amanhecer' : '☾ Sobreviva à noite que se aproxima' };
+        return { text: this.isNight ? L('☾ Sobreviva até o amanhecer', '☾ Survive until dawn') : L('☾ Sobreviva à noite que se aproxima', '☾ Survive the coming night') };
       case 'coffin':
-        return { text: `✝ Destrua o caixão ${this.chapter.goal.place} · ${m(t.coffin)}`, target: t.coffin };
+        return { text: `${L('✝ Destrua o caixão', '✝ Destroy the coffin')} ${this.chapter.goal.place} · ${m(t.coffin)}`, target: t.coffin };
       case 'kills': {
-        const night = this.chapter.goal.night, wait = night && !this.isNight ? ' (à noite)' : '';
-        return { text: `☠ Abata criaturas${night ? ' sob a lua de sangue' : ''} · ${t.n}/${t.goal}${wait}` };
+        const night = this.chapter.goal.night, wait = night && !this.isNight ? L(' (à noite)', ' (at night)') : '';
+        return { text: `${L('☠ Abata criaturas', '☠ Slay creatures')}${night ? L(' sob a lua de sangue', ' under the blood moon') : ''} · ${t.n}/${t.goal}${wait}` };
       }
       case 'boss':
         return t.fight || !this.world.arena
-          ? { text: '☠ Derrote o Conde Drácula' }
-          : { text: `♜ Invada o pátio do Castelo Drácula · ${m(this.world.arena)}`, target: this.world.arena };
+          ? { text: L('☠ Derrote o Conde Drácula', '☠ Defeat Count Dracula') }
+          : { text: `${L('♜ Invada o pátio do Castelo Drácula', '♜ Storm the courtyard of Castle Dracula')} · ${m(this.world.arena)}`, target: this.world.arena };
     }
     return { text: '' };
   }
@@ -215,20 +216,20 @@ export class Campaign {
         const e = this.enemies.spawn(g.type, c.x, c.z, 3, 9);
         if (e && g.name) this.enemies.empower(e, g);
       }
-    this.hud.message('GUARDIÕES', 'Algo desperta para proteger o caixão.', 3);
+    this.hud.message(L('GUARDIÕES', 'GUARDIANS'), L('Algo desperta para proteger o caixão.', 'Something wakes to guard the coffin.'), 3);
     if (this.chapter.guards?.some((g) => g.type === 'wolf')) sfx.howl();
   }
 
   // --- events from the game
   onNightfall(night) {
     this.save.stats.nights = night;
-    if (this.bloodMoon) this.hud.message('LUA DE SANGUE', 'O céu sangra sobre o vale.');
-    else this.hud.message(`NOITE ${night}`, this.task.kind === 'survive' ? 'Sobreviva até o amanhecer.' : 'As criaturas despertam.');
+    if (this.bloodMoon) this.hud.message(L('LUA DE SANGUE', 'BLOOD MOON'), L('O céu sangra sobre o vale.', 'The sky bleeds over the valley.'));
+    else this.hud.message(`${L('NOITE', 'NIGHT')} ${night}`, this.task.kind === 'survive' ? L('Sobreviva até o amanhecer.', 'Survive until dawn.') : L('As criaturas despertam.', 'The creatures awaken.'));
   }
 
   onDawn() {
-    if (this.task.kind === 'survive' && this.task.sawNight && !this.task.done) this.complete('O SOL NASCE', 'Você sobreviveu à noite.');
-    else this.hud.message('AMANHECER', 'Os vampiros queimam sob o sol.');
+    if (this.task.kind === 'survive' && this.task.sawNight && !this.task.done) this.complete(L('O SOL NASCE', 'THE SUN RISES'), L('Você sobreviveu à noite.', 'You survived the night.'));
+    else this.hud.message(L('AMANHECER', 'DAWN'), L('Os vampiros queimam sob o sol.', 'The vampires burn in the sun.'));
   }
 
   onKill(e) {
@@ -250,7 +251,7 @@ export class Campaign {
   }
 
   // --- progression
-  complete(title = 'CAPÍTULO CONCLUÍDO', sub = `${this.chapter.title} · bônus de experiência`) {
+  complete(title = L('CAPÍTULO CONCLUÍDO', 'CHAPTER COMPLETE'), sub = `${this.chapter.title} · ${L('bônus de experiência', 'experience bonus')}`) {
     const s = this.save, ch = this.chapter;
     if (this.player.dead) return; // e.g. dawn breaking over the body: the death already rewound the save
     this.task.done = true;
@@ -260,7 +261,7 @@ export class Campaign {
     sfx.bell(2);
     if (ch.gate) {
       this.world.openGate?.();
-      this.hud.message('OS PORTÕES SE ABREM', 'O Castelo Drácula aguarda...', 5);
+      this.hud.message(L('OS PORTÕES SE ABREM', 'THE GATES OPEN'), L('O Castelo Drácula aguarda...', 'Castle Dracula awaits...'), 5);
     }
     s.chapter++;
     this.setupChapter();
@@ -270,7 +271,7 @@ export class Campaign {
 
   victory() {
     const s = this.save;
-    this.hud.message('VITÓRIA', 'O Conde Drácula retorna ao pó... por enquanto.', 5);
+    this.hud.message(L('VITÓRIA', 'VICTORY'), L('O Conde Drácula retorna ao pó... por enquanto.', 'Count Dracula returns to dust... for now.'), 5);
     sfx.bell(3);
     s.stats.kills = this.enemies.kills;
     s.stats.souls = this.enemies.souls;
@@ -297,7 +298,7 @@ export class Campaign {
     this.snapshot = cloneSave(s);
     const ok = writeSave(s);
     updateRecords(s, this.global);
-    if (toast) this.hud.toast(ok ? '✦ Progresso salvo' : 'Este navegador não permite salvar o progresso');
+    if (toast) this.hud.toast(ok ? L('✦ Progresso salvo', '✦ Progress saved') : L('Este navegador não permite salvar o progresso', 'This browser does not allow saving progress'));
   }
 
   gainXp(xp) {
@@ -308,7 +309,7 @@ export class Campaign {
     const rank = rankOf(s.level);
     if (rank !== before) {
       this.player.setRank(rank);
-      this.hud.message('NOVO TÍTULO', `${rank.name} — sua lâmina brilha com uma nova cor.`, 4);
+      this.hud.message(L('NOVO TÍTULO', 'NEW TITLE'), `${rank.name} — ${L('sua lâmina brilha com uma nova cor.', 'your blade glows with a new color.')}`, 4);
     }
     this.persistProgress();
   }
@@ -369,19 +370,20 @@ export class Campaign {
   deathReport() {
     const r = this.report, D = this.diff;
     const penalty = r.permadeath
-      ? `<em>Pesadelo: a caçada termina aqui e o save foi apagado.</em><br>Recorde: capítulo ${r.records.chapter + 1} · nível ${r.records.level}`
+      ? L(`<em>Pesadelo: a caçada termina aqui e o save foi apagado.</em><br>Recorde: capítulo ${r.records.chapter + 1} · nível ${r.records.level}`,
+        `<em>Nightmare: the hunt ends here and the save was erased.</em><br>Record: chapter ${r.records.chapter + 1} · level ${r.records.level}`)
       : D.keepXp
-        ? '<em>Você volta ao início do capítulo, com toda a experiência.</em>'
-        : `<em>Você volta ao início do capítulo, no nível ${this.next.level}.</em>`;
-    return `${r.chapter}<br>Nível <b>${r.level}</b> · ${r.rank}<br>` +
-      `Criaturas abatidas: <b>${r.kills}</b> · Almas: <b>${r.souls}</b><br>${penalty}`;
+        ? L('<em>Você volta ao início do capítulo, com toda a experiência.</em>', '<em>You return to the start of the chapter, keeping all your experience.</em>')
+        : L(`<em>Você volta ao último ponto salvo, no nível ${this.next.level}.</em>`, `<em>You return to the last save point, at level ${this.next.level}.</em>`);
+    return `${r.chapter}<br>${L('Nível', 'Level')} <b>${r.level}</b> · ${r.rank}<br>` +
+      `${L('Criaturas abatidas', 'Creatures slain')}: <b>${r.kills}</b> · ${L('Almas', 'Souls')}: <b>${r.souls}</b><br>${penalty}`;
   }
 
   victoryReport() {
     const r = this.report, t = Math.floor(r.time);
-    return `Ciclo ${roman(r.cycle)} concluído · Nível <b>${r.level}</b> · ${r.rank}<br>` +
-      `Tempo: <b>${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s</b> · Quedas: <b>${r.deaths}</b><br>` +
-      `Criaturas abatidas: <b>${r.kills}</b> · Almas: <b>${r.souls}</b><br>` +
-      `<em>O Ciclo ${roman(r.cycle + 1)} traz criaturas mais fortes e mais elites.</em>`;
+    return L(`Ciclo ${roman(r.cycle)} concluído`, `Cycle ${roman(r.cycle)} complete`) + ` · ${L('Nível', 'Level')} <b>${r.level}</b> · ${r.rank}<br>` +
+      `${L('Tempo', 'Time')}: <b>${Math.floor(t / 60)}m ${String(t % 60).padStart(2, '0')}s</b> · ${L('Quedas', 'Falls')}: <b>${r.deaths}</b><br>` +
+      `${L('Criaturas abatidas', 'Creatures slain')}: <b>${r.kills}</b> · ${L('Almas', 'Souls')}: <b>${r.souls}</b><br>` +
+      L(`<em>O Ciclo ${roman(r.cycle + 1)} traz criaturas mais fortes e mais elites.</em>`, `<em>Cycle ${roman(r.cycle + 1)} brings stronger creatures and more elites.</em>`);
   }
 }

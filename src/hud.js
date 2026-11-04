@@ -1,5 +1,6 @@
 import { CASTLE } from './world.js';
 import './campaign.css';
+import { L } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -37,7 +38,7 @@ export class Hud {
     // level-up perk choice (built here so index.html stays untouched)
     this.lu = el('div', { id: 'levelup', className: 'overlay hidden' }, document.body);
     this.lu.innerHTML = `<h1 id="luTitle"></h1><h2 id="luRank"></h2><p id="luHint"></p><div id="perks"></div>
-      <p class="lu-keys desk-only">1 · 2 · 3 — ou mova o mouse e clique</p>`;
+      <p class="lu-keys desk-only">${L('1 · 2 · 3 — ou mova o mouse e clique', '1 · 2 · 3 — or move the mouse and click')}</p>`;
     this.perkSel = 0;
     this.perkAcc = 0;
     this.perkKeys = [];
@@ -73,10 +74,10 @@ export class Hud {
     this.perkKeys = info.choices.map((c) => c.key);
     this.perkSel = Math.min(this.perkSel, this.perkKeys.length - 1);
     this.perkAcc = 0;
-    $('luTitle').textContent = `Nível ${info.level}`;
+    $('luTitle').textContent = `${L('Nível', 'Level')} ${info.level}`;
     $('luRank').textContent = info.rank.name;
     $('luRank').style.color = hex(info.rank.color);
-    $('luHint').textContent = info.picks > 1 ? `Escolha um dom (${info.picks} pendentes)` : 'Escolha um dom';
+    $('luHint').textContent = info.picks > 1 ? L(`Escolha um dom (${info.picks} pendentes)`, `Choose a gift (${info.picks} pending)`) : L('Escolha um dom', 'Choose a gift');
     const box = $('perks');
     box.replaceChildren();
     info.choices.forEach((c, i) => {

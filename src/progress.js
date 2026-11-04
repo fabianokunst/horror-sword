@@ -1,4 +1,6 @@
 // Hunter progression: difficulty presets, XP/levels, perks ("dons") and the localStorage save.
+import { L } from './i18n.js';
+
 const SAVE_KEY = 'horror-sword:save';
 const RECORD_KEY = 'horror-sword:records';
 const PREFS_KEY = 'horror-sword:prefs';
@@ -8,37 +10,37 @@ const VERSION = 1;
 // attackers is how many creatures may strike at the same time (the others circle and wait).
 // keepXp: dying keeps what was earned since the checkpoint; permadeath: dying erases the save.
 export const DIFFICULTIES = {
-  easy: { name: 'Peregrino', desc: 'Criaturas frágeis. Ao cair, você mantém a experiência.', hp: 0.7, dmg: 0.6, spawn: 0.75, elite: -0.05, xp: 1, attackers: 2, keepXp: true },
-  normal: { name: 'Caçador', desc: 'A caçada como deve ser. Ao cair, volta ao início do capítulo.', hp: 1, dmg: 1, spawn: 1, elite: 0, xp: 1, attackers: 3 },
-  hard: { name: 'Van Helsing', desc: 'Mais criaturas, mais fortes e mais elites. +25% de experiência.', hp: 1.4, dmg: 1.35, spawn: 1.2, elite: 0.05, xp: 1.25, attackers: 3 },
-  nightmare: { name: 'Pesadelo', desc: 'Uma vida só. Ao cair, o save é apagado. +50% de experiência.', hp: 1.8, dmg: 1.7, spawn: 1.4, elite: 0.1, xp: 1.5, attackers: 4, permadeath: true },
+  easy: { name: L('Peregrino', 'Pilgrim'), desc: L('Criaturas frágeis. Ao cair, você mantém a experiência.', 'Frail creatures. When you fall, you keep your experience.'), hp: 0.7, dmg: 0.6, spawn: 0.75, elite: -0.05, xp: 1, attackers: 2, keepXp: true },
+  normal: { name: L('Caçador', 'Hunter'), desc: L('A caçada como deve ser. Ao cair, volta ao último ponto salvo.', 'The hunt as it should be. When you fall, you go back to the last save point.'), hp: 1, dmg: 1, spawn: 1, elite: 0, xp: 1, attackers: 3 },
+  hard: { name: 'Van Helsing', desc: L('Mais criaturas, mais fortes e mais elites. +25% de experiência.', 'More creatures, stronger, more elites. +25% experience.'), hp: 1.4, dmg: 1.35, spawn: 1.2, elite: 0.05, xp: 1.25, attackers: 3 },
+  nightmare: { name: L('Pesadelo', 'Nightmare'), desc: L('Uma vida só. Ao cair, o save é apagado. +50% de experiência.', 'One life. When you fall, the save is erased. +50% experience.'), hp: 1.8, dmg: 1.7, spawn: 1.4, elite: 0.1, xp: 1.5, attackers: 4, permadeath: true },
 };
 
 // Titles earned by level; the blade, lantern and slashes take the rank's color.
 export const RANKS = [
-  { level: 1, name: 'Aprendiz', color: 0x40e8ff, finisher: 0xff70e0 },
-  { level: 5, name: 'Juramentado', color: 0xffc040, finisher: 0xff8030 },
-  { level: 10, name: 'Matador de Vampiros', color: 0xff3050, finisher: 0xffb040 },
-  { level: 15, name: 'Inquisidor', color: 0xb060ff, finisher: 0x60e8ff },
-  { level: 22, name: 'Lenda da Noite', color: 0xf4f8ff, finisher: 0xffd060 },
+  { level: 1, name: L('Aprendiz', 'Apprentice'), color: 0x40e8ff, finisher: 0xff70e0 },
+  { level: 5, name: L('Juramentado', 'Sworn'), color: 0xffc040, finisher: 0xff8030 },
+  { level: 10, name: L('Matador de Vampiros', 'Vampire Slayer'), color: 0xff3050, finisher: 0xffb040 },
+  { level: 15, name: L('Inquisidor', 'Inquisitor'), color: 0xb060ff, finisher: 0x60e8ff },
+  { level: 22, name: L('Lenda da Noite', 'Legend of the Night'), color: 0xf4f8ff, finisher: 0xffd060 },
 ];
 export const rankOf = (level) => RANKS.reduce((r, k) => (level >= k.level ? k : r), RANKS[0]);
 
 export const PERKS = {
-  vigor: { name: 'Vigor', icon: '♥', desc: '+25 de vida máxima', max: 5 },
-  couraca: { name: 'Couraça', icon: '⛨', desc: '-10% de dano recebido', max: 4 },
-  folego: { name: 'Fôlego', icon: '≋', desc: '+20 de stamina e recuperação 15% mais rápida', max: 4 },
-  lamina: { name: 'Lâmina Rúnica', icon: '†', desc: '+20% de dano da espada', max: 5 },
-  longa: { name: 'Lâmina Longa', icon: '⟷', desc: '+12% de alcance dos golpes', max: 3 },
-  golpe: { name: 'Golpe de Misericórdia', icon: '✠', desc: 'O 3º golpe do combo causa +60% de dano', max: 3 },
-  sangue: { name: 'Sede de Sangue', icon: '❦', desc: 'Cada criatura atingida pela espada cura 1 de vida', max: 3 },
-  almas: { name: 'Colheita de Almas', icon: '✦', desc: 'Almas curam 50% mais e são atraídas de mais longe', max: 3 },
-  aljava: { name: 'Aljava', icon: '➶', desc: '+2 virotes na besta', max: 3 },
-  prata: { name: 'Prata Benta', icon: '✚', desc: '+50% de dano da besta', max: 4 },
-  maos: { name: 'Mãos Ágeis', icon: '↻', desc: 'Virotes recarregam 30% mais rápido', max: 3 },
-  perfura: { name: 'Virote Perfurante', icon: '⇶', desc: 'Virotes atravessam mais uma criatura', max: 2 },
-  fantasma: { name: 'Passo Fantasma', icon: '◌', desc: 'Esquiva custa 30% menos stamina e vai mais longe', max: 2 },
-  ligeiro: { name: 'Pés Ligeiros', icon: '»', desc: '+8% de velocidade', max: 3 },
+  vigor: { name: 'Vigor', icon: '♥', desc: L('+25 de vida máxima', '+25 max health'), max: 5 },
+  couraca: { name: L('Couraça', 'Cuirass'), icon: '⛨', desc: L('-10% de dano recebido', '-10% damage taken'), max: 4 },
+  folego: { name: L('Fôlego', 'Second Wind'), icon: '≋', desc: L('+20 de stamina e recuperação 15% mais rápida', '+20 stamina and 15% faster recovery'), max: 4 },
+  lamina: { name: L('Lâmina Rúnica', 'Runic Blade'), icon: '†', desc: L('+20% de dano da espada', '+20% sword damage'), max: 5 },
+  longa: { name: L('Lâmina Longa', 'Long Blade'), icon: '⟷', desc: L('+12% de alcance dos golpes', '+12% strike reach'), max: 3 },
+  golpe: { name: L('Golpe de Misericórdia', 'Coup de Grâce'), icon: '✠', desc: L('O 3º golpe do combo causa +60% de dano', 'The 3rd combo hit deals +60% damage'), max: 3 },
+  sangue: { name: L('Sede de Sangue', 'Bloodthirst'), icon: '❦', desc: L('Cada criatura atingida pela espada cura 1 de vida', 'Each creature the sword hits heals 1 health'), max: 3 },
+  almas: { name: L('Colheita de Almas', 'Soul Harvest'), icon: '✦', desc: L('Almas curam 50% mais e são atraídas de mais longe', 'Souls heal 50% more and are drawn from farther away'), max: 3 },
+  aljava: { name: L('Aljava', 'Quiver'), icon: '➶', desc: L('+2 virotes na besta', '+2 crossbow bolts'), max: 3 },
+  prata: { name: L('Prata Benta', 'Blessed Silver'), icon: '✚', desc: L('+50% de dano da besta', '+50% crossbow damage'), max: 4 },
+  maos: { name: L('Mãos Ágeis', 'Nimble Hands'), icon: '↻', desc: L('Virotes recarregam 30% mais rápido', 'Bolts reload 30% faster'), max: 3 },
+  perfura: { name: L('Virote Perfurante', 'Piercing Bolt'), icon: '⇶', desc: L('Virotes atravessam mais uma criatura', 'Bolts pass through one more creature'), max: 2 },
+  fantasma: { name: L('Passo Fantasma', 'Ghost Step'), icon: '◌', desc: L('Esquiva custa 30% menos stamina e vai mais longe', 'Dodging costs 30% less stamina and goes farther'), max: 2 },
+  ligeiro: { name: L('Pés Ligeiros', 'Fleet Feet'), icon: '»', desc: L('+8% de velocidade', '+8% speed'), max: 3 },
 };
 
 // XP needed to go from `level` to `level + 1`.

@@ -19,6 +19,7 @@ import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
 import { Interact } from './interact.js';
+import { L, EN, translatePage, setLang } from './i18n.js';
 
 const CYCLE = 240; // seconds for a full day/night
 // perfect dodge: creatures crawl at WITCH_SLOW speed for WITCH real seconds, the blade hits harder a bit longer
@@ -27,6 +28,8 @@ const FOV = 62; // vertical, for landscape screens
 const MIN_HFOV = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * 4 / 3); // what a 4:3 screen sees
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerpAngle = (a, b, t) => a + (((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI) * t;
+
+translatePage(); // index.html texts in the chosen language (i18n.js)
 
 // ------------------------------------------------------------------ renderer & scene
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -150,20 +153,21 @@ enemies.onPerfectDodge = () => {
   player.perfectDodge(WITCH + 0.5);
   sfx.perfect();
   fx.burst(player.pos.clone().setY(player.pos.y + 1), player.rank.color, 24, { speed: 6, up: 2, gravity: 0, life: 0.5, size: 0.12 });
-  hud.toast('✦ Esquiva perfeita — contra-ataque!');
+  hud.toast(L('✦ Esquiva perfeita — contra-ataque!', '✦ Perfect dodge — counter!'));
   buzz(30, 0.3);
 };
 // the Count changes phase: title card, organ and thunder, and a shockwave that throws the hunter back
 enemies.onBossPhase = (e, stage) => {
-  hud.message(stage === 2 ? 'NÉVOA E SANGUE' : 'A FÚRIA DO CONDE',
-    stage === 2 ? 'O Conde se desfaz em névoa... cuidado com o sangue que ele lança.' : 'Ferido, ele golpeia duas vezes e não dá trégua.', 3.5);
+  hud.message(stage === 2 ? L('NÉVOA E SANGUE', 'MIST AND BLOOD') : L('A FÚRIA DO CONDE', "THE COUNT'S FURY"),
+    stage === 2 ? L('O Conde se desfaz em névoa... cuidado com o sangue que ele lança.', 'The Count dissolves into mist... beware the blood he hurls.')
+      : L('Ferido, ele golpeia duas vezes e não dá trégua.', 'Wounded, he strikes twice and gives no quarter.'), 3.5);
   sfx.bossPhase(e.pos);
   fx.shake += 0.8;
   buzz(120, 1);
   const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z, d = Math.hypot(dx, dz) || 1;
   if (d < 8) { player.vel.x += (dx / d) * 14; player.vel.z += (dz / d) * 14; }
 };
-enemies.onStagger = () => { hud.toast('Atordoado pelo grito! Esquive quando ela inspirar.'); fx.shake += 0.4; };
+enemies.onStagger = () => { hud.toast(L('Atordoado pelo grito! Esquive quando ela inspirar.', 'Stunned by the scream! Dodge when she draws breath.')); fx.shake += 0.4; };
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
 enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); };
@@ -204,7 +208,7 @@ function startFinalFight() {
   enemies.spawnAt('dracula', world.arena.x, world.arena.z - 14);
   enemies.spawnAt('bride', world.arena.x - 8, world.arena.z - 8);
   enemies.spawnAt('bride', world.arena.x + 8, world.arena.z - 8);
-  hud.message('CONDE DRÁCULA', 'Bem-vindo ao meu castelo, caçador.', 5);
+  hud.message(L('CONDE DRÁCULA', 'COUNT DRACULA'), L('Bem-vindo ao meu castelo, caçador.', 'Welcome to my castle, hunter.'), 5);
   campaign.onFinalFight();
   sfx.boss();
 }
@@ -218,7 +222,7 @@ function showWin() {
   deadUi.classList.add('hidden');
   touch.show(false);
   document.getElementById('winStats').innerHTML = campaign.victoryReport();
-  winBtn.textContent = `CICLO ${roman(campaign.save.cycle + 1)}`;
+  winBtn.textContent = `${L('CICLO', 'CYCLE')} ${roman(campaign.save.cycle + 1)}`;
   winUi.classList.remove('hidden');
 }
 // new game+: the saved hunt already moved to the next cycle when the Count fell
@@ -247,6 +251,7 @@ const huntMenu = new HuntMenu(playBtn);
 
 // back into the action from any overlay (title, pause, level-up, death, victory)
 function resume() {
+  document.getElementById('langBtn')?.remove(); // the language is picked before the first hunt
   initAudio();
   setPaused(false);
   if (input.touch) goFullscreen();
@@ -309,7 +314,7 @@ function pause() {
   if (state !== 'play') return;
   state = 'pause';
   setPaused(true);
-  playBtn.textContent = 'CONTINUAR';
+  playBtn.textContent = L('CONTINUAR', 'CONTINUE');
   menu.classList.remove('hidden');
   touch.show(false);
   if (document.pointerLockElement) document.exitPointerLock();
@@ -325,9 +330,18 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 
 // sound on/off: menu button (works on touch too) and the M key; remembered between visits
 const soundBtn = document.getElementById('soundBtn');
-const soundLabel = () => { if (soundBtn) soundBtn.textContent = isMuted() ? '♪ SOM: DESLIGADO' : '♪ SOM: LIGADO'; };
+const soundLabel = () => { if (soundBtn) soundBtn.textContent = isMuted() ? L('♪ SOM: DESLIGADO', '♪ SOUND: OFF') : L('♪ SOM: LIGADO', '♪ SOUND: ON'); };
 soundBtn?.addEventListener('click', () => { toggleMute(); soundLabel(); });
 soundLabel();
+
+// language: only on the title screen (switching reloads the page, which would cut a hunt short)
+const langBtn = document.createElement('button');
+langBtn.className = 'secondary';
+langBtn.id = 'langBtn';
+langBtn.textContent = EN ? 'LANGUAGE: ENGLISH' : 'IDIOMA: PORTUGUÊS';
+langBtn.title = EN ? 'Mudar para português' : 'Switch to English';
+langBtn.addEventListener('click', () => setLang(EN ? 'pt' : 'en'));
+soundBtn?.after(langBtn);
 
 // video filters (resolution, palette, dithering, CRT): edited live from the menu, saved in localStorage
 const settings = new Settings({
@@ -345,7 +359,7 @@ retro.apply(settings.values);
 applyPrefs(settings.values);
 
 // controllers: a hint the first time one connects; A/Start press the main button of title, pause, death and victory
-pads.onConnect = () => hud.toast('Controle conectado · A pula · X espada · B esquiva · Y besta · LB alvo · LT corre');
+pads.onConnect = () => hud.toast(L('Controle conectado · A pula · X espada · B esquiva · Y besta · LB alvo · LT corre', 'Controller connected · A jump · X sword · B dodge · Y crossbow · LB target · LT run'));
 pads.onMenuPress = (b) => {
   if (settings.isOpen) { if (b === 'B') settings.close(); return; }
   if (b === 'B') return;
@@ -582,10 +596,10 @@ function frame() {
       document.exitPointerLock?.();
       hud.show(false);
       document.getElementById('deadStats').innerHTML = campaign.deathReport();
-      retryBtn.textContent = campaign.report.permadeath ? 'NOVA CAÇADA' : 'TENTAR NOVAMENTE';
+      retryBtn.textContent = campaign.report.permadeath ? L('NOVA CAÇADA', 'NEW HUNT') : L('TENTAR NOVAMENTE', 'TRY AGAIN');
       deadUi.classList.remove('hidden');
     }
-    const label = `${campaign.tag} · ${night === 0 ? 'CREPÚSCULO' : wasNight ? `NOITE ${night}` : `DIA ${night + 1}`}`;
+    const label = `${campaign.tag} · ${night === 0 ? L('CREPÚSCULO', 'DUSK') : wasNight ? `${L('NOITE', 'NIGHT')} ${night}` : `${L('DIA', 'DAY')} ${night + 1}`}`;
     const goal = campaign.objective();
     hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0 });
     if (state === 'play' && campaign.save.picks > 0) openLevelUp();

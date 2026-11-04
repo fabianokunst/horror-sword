@@ -4,19 +4,20 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as W from './world.js';
 import { mulberry32 } from './rng.js';
 import { ps1, glowSprite } from './ps1.js';
+import { L } from './i18n.js';
 
 export const ITEMS = {
-  herbG: { name: 'Erva Verde', desc: 'Erva medicinal colhida nos Cárpatos. Cura parte dos ferimentos.', heal: 30 },
-  herbR: { name: 'Erva Vermelha', desc: 'Sozinha não tem efeito. Misture com uma Erva Verde para potencializar a cura.' },
-  mixGG: { name: 'Ervas Mistas (V+V)', desc: 'Duas ervas verdes moídas juntas. Cura boa parte dos ferimentos.', heal: 60 },
-  mixGR: { name: 'Ervas Mistas (V+R)', desc: 'Erva verde e vermelha moídas juntas. Cura todos os ferimentos.', heal: Infinity },
-  mixGGG: { name: 'Ervas Mistas (V+V+V)', desc: 'Três ervas verdes moídas juntas. Cura todos os ferimentos.', heal: Infinity },
-  water: { name: 'Água Benta', desc: 'Frasco abençoado na abadia. Unja a lâmina: dano em dobro por 30 segundos.', bless: 30 },
+  herbG: { name: L('Erva Verde', 'Green Herb'), desc: L('Erva medicinal colhida nos Cárpatos. Cura parte dos ferimentos.', 'A medicinal herb picked in the Carpathians. Heals some wounds.'), heal: 30 },
+  herbR: { name: L('Erva Vermelha', 'Red Herb'), desc: L('Sozinha não tem efeito. Misture com uma Erva Verde para potencializar a cura.', 'Useless on its own. Mix it with a Green Herb to boost the healing.') },
+  mixGG: { name: L('Ervas Mistas (V+V)', 'Mixed Herbs (G+G)'), desc: L('Duas ervas verdes moídas juntas. Cura boa parte dos ferimentos.', 'Two green herbs ground together. Heals most wounds.'), heal: 60 },
+  mixGR: { name: L('Ervas Mistas (V+R)', 'Mixed Herbs (G+R)'), desc: L('Erva verde e vermelha moídas juntas. Cura todos os ferimentos.', 'Green and red herbs ground together. Heals all wounds.'), heal: Infinity },
+  mixGGG: { name: L('Ervas Mistas (V+V+V)', 'Mixed Herbs (G+G+G)'), desc: L('Três ervas verdes moídas juntas. Cura todos os ferimentos.', 'Three green herbs ground together. Heals all wounds.'), heal: Infinity },
+  water: { name: L('Água Benta', 'Holy Water'), desc: L('Frasco abençoado na abadia. Unja a lâmina: dano em dobro por 30 segundos.', 'A vial blessed at the abbey. Anoint the blade: double damage for 30 seconds.'), bless: 30 },
 };
 
 export const EQUIP = {
-  sword: { name: 'Espada Rúnica' },
-  crossbow: { name: 'Besta de Prata' },
+  sword: { name: L('Espada Rúnica', 'Runic Sword') },
+  crossbow: { name: L('Besta de Prata', 'Silver Crossbow') },
 };
 
 // unordered pairs -> result

@@ -5,6 +5,7 @@ import { createNoise2D } from 'simplex-noise';
 import { lambert, basic, canvasTexture, noiseTexture, glowSprite } from './ps1.js';
 import { mulberry32 } from './rng.js';
 import * as S from './structures.js';
+import { L } from './i18n.js';
 
 export { mulberry32 };
 export const WATER = 0;
@@ -29,13 +30,13 @@ const LAKE = { x: -150, z: -50, r: 30 };
 const RZ0 = riverZ(0);
 
 export const PLACES = [
-  { id: 'village', x: 0, z: 110, r: 38, name: 'Vilarejo de Borgo', sub: 'O último refúgio dos vivos' },
-  { id: 'cemetery', x: -95, z: 90, r: 26, name: 'Cemitério dos Esquecidos', sub: 'Os mortos não descansam aqui' },
-  { id: 'bridge', x: 0, z: RZ0, r: 16, name: 'Ponte do Rio Argeș', sub: '' },
-  { id: 'windmill', x: 120, z: -10, r: 24, name: 'O Moinho Queimado', sub: 'Ainda arde desde a última caçada' },
-  { id: 'gallows', x: -40, z: -40, r: 14, name: 'Colina da Forca', sub: '' },
-  { id: 'abbey', x: -105, z: -95, r: 26, name: 'Abadia de São Miguel', sub: 'Profanada pelo Conde' },
-  { id: 'castle', x: CASTLE.x, z: CASTLE.z, r: 42, name: 'Castelo Drácula', sub: 'Lar do Senhor da Noite' },
+  { id: 'village', x: 0, z: 110, r: 38, name: L('Vilarejo de Borgo', 'Borgo Village'), sub: L('O último refúgio dos vivos', 'The last refuge of the living') },
+  { id: 'cemetery', x: -95, z: 90, r: 26, name: L('Cemitério dos Esquecidos', 'Cemetery of the Forgotten'), sub: L('Os mortos não descansam aqui', 'The dead find no rest here') },
+  { id: 'bridge', x: 0, z: RZ0, r: 16, name: L('Ponte do Rio Argeș', 'Argeș River Bridge'), sub: '' },
+  { id: 'windmill', x: 120, z: -10, r: 24, name: L('O Moinho Queimado', 'The Burnt Mill'), sub: L('Ainda arde desde a última caçada', 'Still smouldering since the last hunt') },
+  { id: 'gallows', x: -40, z: -40, r: 14, name: L('Colina da Forca', 'Gallows Hill'), sub: '' },
+  { id: 'abbey', x: -105, z: -95, r: 26, name: L('Abadia de São Miguel', 'Abbey of Saint Michael'), sub: L('Profanada pelo Conde', 'Desecrated by the Count') },
+  { id: 'castle', x: CASTLE.x, z: CASTLE.z, r: 42, name: L('Castelo Drácula', 'Castle Dracula'), sub: L('Lar do Senhor da Noite', 'Home of the Lord of the Night') },
 ];
 const P = Object.fromEntries(PLACES.map((p) => [p.id, p]));
 

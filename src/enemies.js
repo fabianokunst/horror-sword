@@ -5,6 +5,7 @@ import { heightAt, groundAt, WATER } from './world.js';
 import { basic, glowSprite } from './ps1.js';
 import { sfx } from './audio.js';
 import { NavGrid } from './nav.js';
+import { L } from './i18n.js';
 
 export const TYPES = {
   ghoul: { model: () => 'ghoul', hp: 3, speed: 3.6, dmg: 10, range: 1.5, windup: 0.4, blood: 0x7cff3a, souls: 1, radius: 0.5 },
@@ -16,7 +17,7 @@ export const TYPES = {
   // ranged: keeps 8-13 m away, hexes with homing green orbs and flees when the hunter closes in
   witch: { model: () => 'witch', hp: 4, speed: 4.6, dmg: 12, range: 1.4, windup: 0.45, blood: 0x60ff90, souls: 2, ranged: true, burns: true, radius: 0.45 },
   wolf: { model: () => 'wolf', hp: 6, speed: 8, dmg: 16, range: 1.9, windup: 0.32, blood: 0xc01818, souls: 3, leap: true, radius: 0.6, scale: 1.2 },
-  dracula: { model: () => 'dracula', hp: 45, speed: 5.8, dmg: 24, range: 2.6, windup: 0.42, blood: 0xff1030, souls: 15, blink: 3.5, burns: true, boss: true, radius: 0.8, scale: 1.4, name: 'CONDE DRÁCULA' },
+  dracula: { model: () => 'dracula', hp: 45, speed: 5.8, dmg: 24, range: 2.6, windup: 0.42, blood: 0xff1030, souls: 15, blink: 3.5, burns: true, boss: true, radius: 0.8, scale: 1.4, name: L('CONDE DRÁCULA', 'COUNT DRACULA') },
 };
 
 const ORB_GEO = new THREE.OctahedronGeometry(0.18, 0);

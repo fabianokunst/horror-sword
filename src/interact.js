@@ -8,6 +8,7 @@ import { makeModel } from './characters.js';
 import { groundAt } from './world.js';
 import { ITEMS } from './items.js';
 import { sfx } from './audio.js';
+import { L } from './i18n.js';
 
 const RANGE = 2.6;
 export const WARES = [
@@ -54,7 +55,7 @@ export class Interact {
 
     const shop = (this.shop = el('div', 'overlay hidden', document.body));
     shop.id = 'shop';
-    el('h1', null, shop, 'Mercador');
+    el('h1', null, shop, L('Mercador', 'Merchant'));
     this.purseEl = el('h2', null, shop);
     this.wares = el('div', null, shop);
     this.wares.id = 'wares';
@@ -65,9 +66,9 @@ export class Interact {
       return b;
     });
     this.say = el('p', 'shop-say', shop, '&nbsp;');
-    const close = el('button', 'secondary', shop, 'SAIR');
+    const close = el('button', 'secondary', shop, L('SAIR', 'LEAVE'));
     close.addEventListener('click', () => this.close());
-    el('p', 'lu-keys desk-only', shop, '1 · 2 · 3 · 4 ou ← → e Enter — Esc para sair');
+    el('p', 'lu-keys desk-only', shop, L('1 · 2 · 3 · 4 ou ← → e Enter — Esc para sair', '1 · 2 · 3 · 4 or ← → and Enter — Esc to leave'));
   }
 
   get purse() { return this.campaign.save.purse || 0; }
@@ -98,7 +99,7 @@ export class Interact {
   pray(s, night) {
     if (s.used === night) {
       sfx.deny?.();
-      this.hud.toast('O santuário já atendeu suas preces nesta noite.');
+      this.hud.toast(L('O santuário já atendeu suas preces nesta noite.', 'This shrine has already answered your prayers tonight.'));
       return;
     }
     s.used = night;
@@ -109,7 +110,7 @@ export class Interact {
     sfx.bless();
     this.fx?.burst(new THREE.Vector3(s.x, p.pos.y + 1.4, s.z), 0xffd080, 30, { speed: 3, up: 3, gravity: -0.5, life: 1.2, size: 0.12 });
     this.campaign.checkpoint(false);
-    this.hud.toast('✝ Você reza: vida e virotes restaurados · progresso salvo aqui');
+    this.hud.toast(L('✝ Você reza: vida e virotes restaurados · progresso salvo aqui', '✝ You pray: health and bolts restored · progress saved here'));
   }
 
   open() {
@@ -117,7 +118,7 @@ export class Interact {
     this.sel = 0;
     this.acc = 0;
     this.shop.classList.remove('hidden');
-    this.talk(this.purse ? 'Almas por remédios, caçador. Escolha.' : 'Sem almas, sem negócio. Volte quando tiver caçado.');
+    this.talk(this.purse ? L('Almas por remédios, caçador. Escolha.', 'Souls for remedies, hunter. Take your pick.') : L('Sem almas, sem negócio. Volte quando tiver caçado.', 'No souls, no deal. Come back after the hunt.'));
     this.refresh();
     sfx.select?.();
   }
@@ -135,7 +136,7 @@ export class Interact {
   }
 
   refresh() {
-    this.purseEl.textContent = `✦ ${this.purse} almas`;
+    this.purseEl.textContent = `✦ ${this.purse} ${L('almas', 'souls')}`;
     this.cards.forEach((c, i) => {
       c.classList.toggle('sel', i === this.sel);
       c.classList.toggle('off', WARES[i].price > this.purse);
@@ -149,12 +150,12 @@ export class Interact {
 
   buy(i) {
     const w = WARES[i], s = this.campaign.save;
-    if (w.price > this.purse) { sfx.deny?.(); return this.talk('Almas insuficientes.', true); }
-    if (!this.inv.add(w.id)) { sfx.deny?.(); return this.talk('Seu inventário está cheio.', true); }
+    if (w.price > this.purse) { sfx.deny?.(); return this.talk(L('Almas insuficientes.', 'Not enough souls.'), true); }
+    if (!this.inv.add(w.id)) { sfx.deny?.(); return this.talk(L('Seu inventário está cheio.', 'Your inventory is full.'), true); }
     s.purse -= w.price;
     this.campaign.persistProgress?.();
     sfx.pickup?.();
-    this.talk(`${ITEMS[w.id].name} — negócio fechado.`);
+    this.talk(`${ITEMS[w.id].name} — ${L('negócio fechado.', 'done deal.')}`);
     this.refresh();
   }
 
@@ -188,9 +189,9 @@ export class Interact {
     const n = play && !this.player.dead ? this.nearest() : null;
     let html = '';
     if (n) {
-      const key = touch ? 'TOQUE' : 'E';
-      if (n.kind === 'merchant') html = `<b>${key}</b> Falar com o mercador · ✦ ${this.purse}`;
-      else html = n.s.used === night ? '✝ Santuário (já usado nesta noite)' : `<b>${key}</b> Rezar no santuário`;
+      const key = touch ? L('TOQUE', 'TAP') : 'E';
+      if (n.kind === 'merchant') html = `<b>${key}</b> ${L('Falar com o mercador', 'Talk to the merchant')} · ✦ ${this.purse}`;
+      else html = n.s.used === night ? L('✝ Santuário (já usado nesta noite)', '✝ Shrine (already used tonight)') : `<b>${key}</b> ${L('Rezar no santuário', 'Pray at the shrine')}`;
     }
     if (html !== this.html) this.prompt.innerHTML = this.html = html;
     this.prompt.classList.toggle('hidden', !html);

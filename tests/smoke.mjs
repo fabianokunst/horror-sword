@@ -91,7 +91,8 @@ const frames = (page, n) => page.evaluate((n) => new Promise((r) => {
 
 // fresh hunt, unkillable hunter, no roaming spawns (each check places its own creatures)
 async function startHunt(page, tap = false) {
-  await page.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch {} });
+  // tests read Portuguese texts; headless Chrome would otherwise pick English from its locale
+  await page.evaluateOnNewDocument(() => { try { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'pt'); } catch {} });
   await page.goto(page.__url);
   await page.waitForFunction(() => window.__hs && document.getElementById('play'), WAIT);
   if (tap) await page.tap('#play');
@@ -359,13 +360,49 @@ async function desktop(browser, url, errors) {
   await page.close();
 }
 
+// English: the title screen, settings and the chapter banner switch language; the button switches back
+async function english(browser, url, errors) {
+  const page = await browser.newPage();
+  page.on('pageerror', (e) => errors.push('english: ' + e.message));
+  await page.setViewport({ width: 640, height: 360 });
+  await page.goto(url);
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'en'); });
+  await page.reload();
+  await page.waitForFunction(() => window.__hs && document.getElementById('play'), WAIT);
+  const en = await page.evaluate(() => ({
+    lang: document.documentElement.lang,
+    play: document.getElementById('play').textContent,
+    lore: document.querySelector('.lore').textContent.slice(0, 20),
+    sections: [...document.querySelectorAll('#settings h4')].map((h) => h.textContent),
+    button: document.getElementById('langBtn')?.textContent,
+  }));
+  await page.click('#play');
+  await page.waitForFunction(() => __hs.state() === 'play', WAIT);
+  const banner = await page.waitForFunction(() => document.getElementById('msgTitle').textContent, { ...WAIT, timeout: 30000 }).then((h) => h.jsonValue(), () => '');
+  check('English: title, settings and chapter banner', en.lang === 'en' && en.play === 'HUNT' && en.lore.startsWith('When the sun') && en.sections.includes('Controls') && /^CHAPTER/.test(banner), { ...en, banner });
+  await page.close();
+
+  // the title-screen button switches back to Portuguese (reload)
+  const p2 = await browser.newPage();
+  p2.on('pageerror', (e) => errors.push('english: ' + e.message));
+  await p2.goto(url);
+  await p2.evaluate(() => { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'en'); });
+  await p2.reload();
+  await p2.waitForFunction(() => document.getElementById('langBtn'), WAIT);
+  await Promise.all([p2.waitForNavigation({ timeout: 60000 }), p2.click('#langBtn')]);
+  await p2.waitForFunction(() => document.getElementById('play'), WAIT);
+  const back = await p2.evaluate(() => ({ lang: document.documentElement.lang, play: document.getElementById('play').textContent }));
+  check('language button switches back to Portuguese', back.lang === 'pt-BR' && back.play === 'CAÇAR', back);
+  await p2.close();
+}
+
 // a fake standard-mapping controller (navigator.getGamepads is replaced before the game loads)
 async function gamepad(browser, url, errors) {
   const page = await browser.newPage();
   page.on('pageerror', (e) => errors.push('gamepad: ' + e.message));
   await page.setViewport({ width: 640, height: 360 });
   await page.evaluateOnNewDocument(() => {
-    try { localStorage.clear(); } catch {}
+    try { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'pt'); } catch {}
     const pad = { id: 'smoke-test pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
     window.__pad = pad;
     Object.defineProperty(navigator, 'getGamepads', { value: () => [pad], configurable: true });
@@ -451,6 +488,7 @@ try {
   });
   await desktop(browser, url, errors);
   await gamepad(browser, url, errors);
+  await english(browser, url, errors);
   await touch(browser, url, errors);
   await offline(browser, `http://127.0.0.1:${prodServer.address().port}/`, PROD, errors);
 } catch (e) {

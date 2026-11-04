@@ -4,23 +4,24 @@ import * as THREE from 'three';
 import './inventory.css';
 import { ITEMS, EQUIP, combine, itemModel, Pickups } from './items.js';
 import { sfx } from './audio.js';
+import { L } from './i18n.js';
 
 const SLOTS = 8, COLS = 4, ROWS = SLOTS / COLS;
 const START = ['herbG', 'water'];
-const ACTIONS = [['use', 'USAR'], ['startCombine', 'COMBINAR'], ['examine', 'EXAMINAR'], ['drop', 'DESCARTAR']];
+const ACTIONS = [['use', L('USAR', 'USE')], ['startCombine', L('COMBINAR', 'COMBINE')], ['examine', L('EXAMINAR', 'EXAMINE')], ['drop', L('DESCARTAR', 'DISCARD')]];
 const LOOT = { ghoul: 0.12, vampire: 0.18, bat: 0.05, bride: 0.35, wolf: 0.22, witch: 0.3 };
 const BLESS_MAX = 90;
 const PV = 96; // preview render size, upscaled with chunky pixels
 const ICON_POSE = { sword: [0, 0.3, -0.8], crossbow: [0.5, 0.9, 0] };
 // hp fraction above which each condition applies: label, color, heart rate
-const COND = [[0.66, 'BEM', '#3cff6a', 1.1], [0.4, 'CUIDADO', '#ffd23c', 1.45], [0.2, 'CUIDADO', '#ff8a2a', 1.8], [-1, 'PERIGO', '#ff2a3a', 2.3]];
+const COND = [[0.66, L('BEM', 'FINE'), '#3cff6a', 1.1], [0.4, L('CUIDADO', 'CAUTION'), '#ffd23c', 1.45], [0.2, L('CUIDADO', 'CAUTION'), '#ff8a2a', 1.8], [-1, L('PERIGO', 'DANGER'), '#ff2a3a', 2.3]];
 const HELP = {
-  grid: 'WASD mover · E selecionar · TAB fechar',
-  menu: 'W/S escolher · E confirmar · Q voltar',
-  combine: 'Escolha o item para combinar · Q cancelar',
-  examine: 'WASD girar · Q voltar',
+  grid: L('WASD mover · E selecionar · TAB fechar', 'WASD move · E select · TAB close'),
+  menu: L('W/S escolher · E confirmar · Q voltar', 'W/S choose · E confirm · Q back'),
+  combine: L('Escolha o item para combinar · Q cancelar', 'Choose the item to combine with · Q cancel'),
+  examine: L('WASD girar · Q voltar', 'WASD rotate · Q back'),
 };
-const TOUCH_HELP = { grid: 'Toque em um item', menu: 'Toque em uma ação', combine: 'Toque no item para combinar', examine: 'Toque para voltar' };
+const TOUCH_HELP = { grid: L('Toque em um item', 'Tap an item'), menu: L('Toque em uma ação', 'Tap an action'), combine: L('Toque no item para combinar', 'Tap the item to combine with'), examine: L('Toque para voltar', 'Tap to go back') };
 const BAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 8h18v12H3zM9 8V5h6v3M3 13h18" /></svg>';
 
 const el = (tag, cls, parent, html) => {
@@ -137,18 +138,18 @@ export class Inventory {
     const root = el('div', 'hidden', document.body);
     root.id = 'inv';
     const win = el('div', 'inv-win', root);
-    const head = el('div', 'inv-head', win, '<span>INVENTÁRIO</span>');
+    const head = el('div', 'inv-head', win, `<span>${L('INVENTÁRIO', 'INVENTORY')}</span>`);
     const x = el('button', 'inv-x', head, '✕');
     x.addEventListener('click', () => this.close());
 
     const body = el('div', 'inv-body', win);
     const left = el('div', 'inv-col', body);
-    const cond = el('div', 'inv-box inv-cond', left, '<div class="inv-lbl">CONDIÇÃO</div>');
+    const cond = el('div', 'inv-box inv-cond', left, `<div class="inv-lbl">${L('CONDIÇÃO', 'CONDITION')}</div>`);
     const ecg = el('canvas', 'inv-ecg', cond);
     ecg.width = this.ecg.ys.length;
     ecg.height = 48;
     const state = el('div', 'inv-state', cond);
-    const equip = el('div', 'inv-box inv-equip', left, '<div class="inv-lbl">EQUIPADO</div>');
+    const equip = el('div', 'inv-box inv-equip', left, `<div class="inv-lbl">${L('EQUIPADO', 'EQUIPPED')}</div>`);
     const eq = (id, extra) => {
       const row = el('div', 'inv-eq', equip, `<img src="${this.icons[id]}" alt="">`);
       el('span', null, row, EQUIP[id].name.toUpperCase());
@@ -187,7 +188,7 @@ export class Inventory {
     // on-screen button for touch mode; touch.js turns it into a virtual Tab press
     const touchEl = document.getElementById('touch');
     if (touchEl) {
-      const b = el('div', 'tb', touchEl, BAG + '<small>ITENS</small>');
+      const b = el('div', 'tb', touchEl, BAG + `<small>${L('ITENS', 'ITEMS')}</small>`);
       b.id = 'tbInv';
       b.dataset.key = 'Tab';
     }
@@ -208,12 +209,12 @@ export class Inventory {
     const p = this.pickups.nearest(this.player.pos);
     if (!p) return;
     if (!this.add(p.id)) {
-      this.flash('Não há espaço para carregar mais itens.');
+      this.flash(L('Não há espaço para carregar mais itens.', 'There is no room to carry more items.'));
       sfx.deny?.();
       return;
     }
     this.pickups.remove(p, true);
-    this.flash(`Você pegou: ${ITEMS[p.id].name}.`);
+    this.flash(`${L('Você pegou', 'You picked up')}: ${ITEMS[p.id].name}.`);
     sfx.pickup();
   }
 
@@ -326,37 +327,37 @@ export class Inventory {
     const id = this.slots[this.cursor], it = ITEMS[id], p = this.player;
     this.mode = 'grid';
     if (it.heal) {
-      if (p.hp >= p.maxHp) return this.say('Você não está ferido.', true);
+      if (p.hp >= p.maxHp) return this.say(L('Você não está ferido.', 'You are not hurt.'), true);
       p.heal(it.heal);
       this.slots[this.cursor] = null;
-      this.say(`Você usou: ${it.name}.`);
+      this.say(`${L('Você usou', 'You used')}: ${it.name}.`);
       sfx.heal?.();
       this.fx?.burst(p.pos.clone().setY(p.pos.y + 1), 0x60ff80, 16, { speed: 2, up: 3, gravity: -2, life: 0.8 });
     } else if (it.bless) {
       this.blessed = Math.min(BLESS_MAX, this.blessed + it.bless);
       this.slots[this.cursor] = null;
-      this.say('A lâmina brilha com luz sagrada. Dano em dobro!');
+      this.say(L('A lâmina brilha com luz sagrada. Dano em dobro!', 'The blade shines with holy light. Double damage!'));
       sfx.bless?.();
-    } else this.say('Não é possível usar isso sozinho.', true);
+    } else this.say(L('Não é possível usar isso sozinho.', 'That cannot be used on its own.'), true);
   }
 
   startCombine() {
     this.mode = 'combine';
     this.from = this.cursor;
-    this.say(`Combinar ${ITEMS[this.slots[this.from]].name} com...`);
+    this.say(L(`Combinar ${ITEMS[this.slots[this.from]].name} com...`, `Combine ${ITEMS[this.slots[this.from]].name} with...`));
     sfx.select?.();
   }
 
   finishCombine() {
     const a = this.slots[this.from], b = this.slots[this.cursor];
-    if (this.cursor === this.from || !b) return this.say('Escolha outro item.', true);
+    if (this.cursor === this.from || !b) return this.say(L('Escolha outro item.', 'Choose another item.'), true);
     const r = combine(a, b);
     this.mode = 'grid';
-    if (!r) { this.cursor = this.from; return this.say('Não é possível combinar.', true); }
+    if (!r) { this.cursor = this.from; return this.say(L('Não é possível combinar.', 'These cannot be combined.'), true); }
     this.slots[this.from] = r;
     this.slots[this.cursor] = null;
     this.cursor = this.from;
-    this.say(`Você misturou as ervas: ${ITEMS[r].name}.`);
+    this.say(`${L('Você misturou as ervas', 'You mixed the herbs')}: ${ITEMS[r].name}.`);
     sfx.heal?.();
   }
 
@@ -372,7 +373,7 @@ export class Inventory {
     this.slots[this.cursor] = null;
     this.mode = 'grid';
     this.pickups.spawn(id, p.pos.x + Math.sin(p.facing) * 1.2, p.pos.z + Math.cos(p.facing) * 1.2);
-    this.say(`Você descartou: ${ITEMS[id].name}.`);
+    this.say(`${L('Você descartou', 'You discarded')}: ${ITEMS[id].name}.`);
     sfx.cancel?.();
   }
 
@@ -406,7 +407,7 @@ export class Inventory {
         const a = p.facing + 0.6;
         this.fx.burst(new THREE.Vector3(p.pos.x + Math.sin(a) * 0.5, p.pos.y + 1.2, p.pos.z + Math.cos(a) * 0.5), 0xffd060, 1, { speed: 0.6, up: 1.2, gravity: 0, life: 0.5, size: 0.08 });
       }
-      if (this.blessed === 0) this.flash('A bênção da lâmina se esvaiu.');
+      if (this.blessed === 0) this.flash(L('A bênção da lâmina se esvaiu.', "The blade's blessing has faded."));
     }
     // the hunter's lantern turns golden while the blade is blessed
     const blessed = this.blessed > 0;
@@ -419,12 +420,12 @@ export class Inventory {
     const near = play && !p.dead ? this.pickups.nearest(p.pos) : null;
     if (this.flashT > 0) { this.flashT -= dt; this.promptHtml = ''; }
     else if (near) {
-      const html = `<b>${document.body.classList.contains('touch') ? 'TOQUE' : 'E'}</b> ${ITEMS[near.id].name}`;
+      const html = `<b>${document.body.classList.contains('touch') ? L('TOQUE', 'TAP') : 'E'}</b> ${ITEMS[near.id].name}`;
       if (html !== this.promptHtml) this.dom.prompt.innerHTML = this.promptHtml = html;
     }
     this.dom.prompt.classList.toggle('hidden', !play || (this.flashT <= 0 && !near));
     this.dom.blessHud.classList.toggle('hidden', !play || !blessed);
-    if (blessed) this.dom.blessHud.textContent = `✝ LÂMINA ABENÇOADA ${Math.ceil(this.blessed)}s`;
+    if (blessed) this.dom.blessHud.textContent = `✝ ${L('LÂMINA ABENÇOADA', 'BLESSED BLADE')} ${Math.ceil(this.blessed)}s`;
 
     if (this.isOpen) this.draw(dt);
   }
@@ -462,14 +463,14 @@ export class Inventory {
     const k = p.hp / p.maxHp, [, label, color, rate] = COND.find(([t]) => k > t);
     d.state.textContent = label;
     d.state.style.color = color;
-    this.drawEcg(dt, color, rate, label === 'PERIGO');
+    this.drawEcg(dt, color, rate, k <= 0.2);
     d.blessLbl.textContent = this.blessed > 0 ? `✝ ${Math.ceil(this.blessed)}s` : '';
     d.ammo.textContent = p.bolts != null ? `➶ ${p.bolts}` : '';
 
     // rotating preview of the selected item
     const id = this.slots[this.cursor];
     if (id !== this.pv.id) this.show3d(id);
-    d.name.textContent = id ? ITEMS[id].name : '— vazio —';
+    d.name.textContent = id ? ITEMS[id].name : L('— vazio —', '— empty —');
     const pv = this.pv;
     if (this.mode !== 'examine') pv.spin.rotation.y += dt * 0.9;
     pv.spin.rotation.x = pv.tilt;

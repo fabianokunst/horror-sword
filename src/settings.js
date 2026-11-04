@@ -1,19 +1,21 @@
 // Settings panel: video presets and the retro image filters, plus controls (camera sensitivity, inverted Y)
 // and sound volumes. Everything is edited live and persisted in localStorage.
+import { L } from './i18n.js';
+
 const KEY = 'horror-sword:video'; // (name kept so earlier saved video settings still load)
 
 const PRESETS = [
-  { id: 'tv', name: 'TV de tubo', lines: 180, palette: 'rgb12', bright: 100, vignette: 50, texRes: 1, affine: 70, wobble: 1,
+  { id: 'tv', name: L('TV de tubo', 'CRT TV'), lines: 180, palette: 'rgb12', bright: 100, vignette: 50, texRes: 1, affine: 70, wobble: 1,
     dither: 'bayer4', ditherAmt: 100, crt: true, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'ps1', name: 'PS1 puro', lines: 240, palette: 'rgb15', bright: 100, vignette: 45, texRes: 1, affine: 100, wobble: 1,
+  { id: 'ps1', name: L('PS1 puro', 'Pure PS1'), lines: 240, palette: 'rgb15', bright: 100, vignette: 45, texRes: 1, affine: 100, wobble: 1,
     dither: 'bayer4', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'arcade', name: 'Monitor arcade', lines: 240, palette: 'rgb12', bright: 110, vignette: 30, texRes: 1, affine: 60, wobble: 1,
+  { id: 'arcade', name: L('Monitor arcade', 'Arcade monitor'), lines: 240, palette: 'rgb12', bright: 110, vignette: 30, texRes: 1, affine: 60, wobble: 1,
     dither: 'bayer4', ditherAmt: 80, crt: true, curve: 20, scan: 85, mask: 70, bloom: 55, chroma: 10, noise: 5 },
-  { id: 'dark', name: 'Pixel sombrio', lines: 120, palette: 'gothic', bright: 105, vignette: 65, texRes: 2, affine: 100, wobble: 2,
+  { id: 'dark', name: L('Pixel sombrio', 'Grim pixels'), lines: 120, palette: 'gothic', bright: 105, vignette: 65, texRes: 2, affine: 100, wobble: 2,
     dither: 'bayer8', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'daguerre', name: 'Daguerreótipo', lines: 180, palette: 'sepia', bright: 115, vignette: 80, texRes: 2, affine: 70, wobble: 1,
+  { id: 'daguerre', name: L('Daguerreótipo', 'Daguerreotype'), lines: 180, palette: 'sepia', bright: 115, vignette: 80, texRes: 2, affine: 70, wobble: 1,
     dither: 'noise', ditherAmt: 100, crt: true, curve: 30, scan: 30, mask: 0, bloom: 45, chroma: 0, noise: 45 },
-  { id: 'sharp', name: 'Nítido', lines: 360, palette: 'rgb15', bright: 100, vignette: 30, texRes: 1, affine: 0, wobble: 0,
+  { id: 'sharp', name: L('Nítido', 'Sharp'), lines: 360, palette: 'rgb15', bright: 100, vignette: 30, texRes: 1, affine: 0, wobble: 0,
     dither: 'bayer4', ditherAmt: 50, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
 ];
 
@@ -21,40 +23,40 @@ const on = (v) => v && v !== 'off';
 
 // [section title, controls]; a control with `options` is a select, `toggle` a checkbox, otherwise a 0–100% slider.
 const SECTIONS = [
-  ['Imagem', [
-    { key: 'lines', label: 'Resolução', info: true, options: [[360, '360 linhas'], [270, '270 linhas'], [240, '240 linhas (PS1)'], [180, '180 linhas'], [144, '144 linhas'], [120, '120 linhas'], [96, '96 linhas']] },
-    { key: 'palette', label: 'Cores', options: [['rgb15', '32 mil (PS1, 15 bits)'], ['rgb12', '4096 (12 bits)'], ['rgb9', '512 (9 bits)'], ['rgb6', '64 (6 bits)'], ['gothic', 'Paleta gótica (32)'], ['sepia', 'Daguerreótipo (8 tons)']] },
-    { key: 'bright', label: 'Brilho', min: 50, max: 160 },
-    { key: 'vignette', label: 'Vinheta' },
+  [L('Imagem', 'Image'), [
+    { key: 'lines', label: L('Resolução', 'Resolution'), info: true, options: [360, 270, 240, 180, 144, 120, 96].map((n) => [n, `${n} ${L('linhas', 'lines')}${n === 240 ? ' (PS1)' : ''}`]) },
+    { key: 'palette', label: L('Cores', 'Colors'), options: [['rgb15', L('32 mil (PS1, 15 bits)', '32 thousand (PS1, 15-bit)')], ['rgb12', '4096 (12 bits)'], ['rgb9', '512 (9 bits)'], ['rgb6', '64 (6 bits)'], ['gothic', L('Paleta gótica (32)', 'Gothic palette (32)')], ['sepia', L('Daguerreótipo (8 tons)', 'Daguerreotype (8 tones)')]] },
+    { key: 'bright', label: L('Brilho', 'Brightness'), min: 50, max: 160 },
+    { key: 'vignette', label: L('Vinheta', 'Vignette') },
   ]],
-  ['Texturas', [
-    { key: 'texRes', label: 'Resolução', options: [[1, 'Original'], [2, 'Metade'], [4, 'Um quarto']] },
-    { key: 'affine', label: 'Distorção afim' },
-    { key: 'wobble', label: 'Tremor de vértices', options: [[0, 'Desligado'], [1, 'PS1 (1 px)'], [2, 'Forte (2 px)'], [3, 'Extremo (3 px)']] },
+  [L('Texturas', 'Textures'), [
+    { key: 'texRes', label: L('Resolução', 'Resolution'), options: [[1, 'Original'], [2, L('Metade', 'Half')], [4, L('Um quarto', 'A quarter')]] },
+    { key: 'affine', label: L('Distorção afim', 'Affine warping') },
+    { key: 'wobble', label: L('Tremor de vértices', 'Vertex wobble'), options: [[0, L('Desligado', 'Off')], [1, 'PS1 (1 px)'], [2, L('Forte (2 px)', 'Strong (2 px)')], [3, L('Extremo (3 px)', 'Extreme (3 px)')]] },
   ]],
   ['Dithering', [
-    { key: 'dither', label: 'Padrão', options: [['off', 'Desligado'], ['bayer2', 'Bayer 2×2'], ['bayer4', 'Bayer 4×4'], ['bayer8', 'Bayer 8×8'], ['noise', 'Ruído']] },
-    { key: 'ditherAmt', label: 'Intensidade', max: 200, needs: 'dither' },
+    { key: 'dither', label: L('Padrão', 'Pattern'), options: [['off', L('Desligado', 'Off')], ['bayer2', 'Bayer 2×2'], ['bayer4', 'Bayer 4×4'], ['bayer8', 'Bayer 8×8'], ['noise', L('Ruído', 'Noise')]] },
+    { key: 'ditherAmt', label: L('Intensidade', 'Strength'), max: 200, needs: 'dither' },
   ]],
-  ['Monitor CRT', [
-    { key: 'crt', label: 'Ativado', toggle: true },
-    { key: 'curve', label: 'Curvatura', needs: 'crt' },
+  [L('Monitor CRT', 'CRT monitor'), [
+    { key: 'crt', label: L('Ativado', 'On'), toggle: true },
+    { key: 'curve', label: L('Curvatura', 'Curvature'), needs: 'crt' },
     { key: 'scan', label: 'Scanlines', needs: 'crt' },
-    { key: 'mask', label: 'Máscara RGB', needs: 'crt' },
-    { key: 'bloom', label: 'Brilho difuso', needs: 'crt' },
-    { key: 'chroma', label: 'Aberração cromática', needs: 'crt' },
-    { key: 'noise', label: 'Interferência', needs: 'crt' },
+    { key: 'mask', label: L('Máscara RGB', 'RGB mask'), needs: 'crt' },
+    { key: 'bloom', label: L('Brilho difuso', 'Bloom'), needs: 'crt' },
+    { key: 'chroma', label: L('Aberração cromática', 'Chromatic aberration'), needs: 'crt' },
+    { key: 'noise', label: L('Interferência', 'Interference'), needs: 'crt' },
   ]],
   // not part of the video presets (pref: true)
-  ['Controles', [
-    { key: 'sens', label: 'Sensibilidade da câmera', min: 25, max: 300, pref: true },
-    { key: 'invertY', label: 'Inverter eixo vertical', toggle: true, pref: true },
-    { key: 'vibrate', label: 'Vibração (celular)', toggle: true, pref: true },
+  [L('Controles', 'Controls'), [
+    { key: 'sens', label: L('Sensibilidade da câmera', 'Camera sensitivity'), min: 25, max: 300, pref: true },
+    { key: 'invertY', label: L('Inverter eixo vertical', 'Invert vertical axis'), toggle: true, pref: true },
+    { key: 'vibrate', label: L('Vibração (celular e controle)', 'Vibration (phone and controller)'), toggle: true, pref: true },
   ]],
-  ['Som', [
-    { key: 'vMusic', label: 'Música', pref: true },
-    { key: 'vSfx', label: 'Efeitos', pref: true },
-    { key: 'vAmb', label: 'Ambiente', pref: true },
+  [L('Som', 'Sound'), [
+    { key: 'vMusic', label: L('Música', 'Music'), pref: true },
+    { key: 'vSfx', label: L('Efeitos', 'Effects'), pref: true },
+    { key: 'vAmb', label: L('Ambiente', 'Ambience'), pref: true },
   ]],
 ];
 const CONTROLS = SECTIONS.flatMap(([, list]) => list);
@@ -123,18 +125,18 @@ export class Settings {
     const p = this.panel;
     p.replaceChildren();
     const head = el('div', 'set-head');
-    head.append(el('h3', null, 'Configurações'));
+    head.append(el('h3', null, L('Configurações', 'Settings')));
     const presetRow = el('label', 'set-row');
     this.preset = el('select');
     for (const pr of PRESETS) this.preset.append(new Option(pr.name, pr.id));
-    this.custom = new Option('Personalizado', '');
+    this.custom = new Option(L('Personalizado', 'Custom'), '');
     this.custom.disabled = true;
     this.preset.append(this.custom);
     this.preset.addEventListener('change', () => {
       const { id, name, ...v } = PRESETS.find((pr) => pr.id === this.preset.value);
       this.set(v);
     });
-    presetRow.append(el('span', null, 'Predefinição'), this.preset);
+    presetRow.append(el('span', null, L('Predefinição', 'Preset')), this.preset);
     head.append(presetRow);
 
     const body = el('div', 'set-body');
@@ -146,9 +148,9 @@ export class Settings {
     }
 
     const foot = el('div', 'set-foot');
-    const reset = el('button', 'small', 'Restaurar');
+    const reset = el('button', 'small', L('Restaurar', 'Reset'));
     reset.addEventListener('click', () => this.set(defaults()));
-    const back = el('button', 'small', 'Voltar');
+    const back = el('button', 'small', L('Voltar', 'Back'));
     back.addEventListener('click', () => this.close());
     foot.append(reset, back);
     p.append(head, body, foot);

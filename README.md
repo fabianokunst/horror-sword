@@ -2,6 +2,8 @@
 
 Jogo de ação em mundo aberto com clima gótico (Drácula / Van Helsing), feito em **Three.js** com visual estilo PlayStation 1.
 
+**Idiomas:** português e inglês. Na primeira visita o jogo segue o idioma do navegador; o botão IDIOMA / LANGUAGE na tela de título troca (recarrega a página; ele some depois que a caçada começa para não interromper). Os textos ficam lado a lado no código como `L('português', 'English')` ([`src/i18n.js`](src/i18n.js)); os do `index.html` são trocados por `translatePage()`. Ao escrever um texto novo, coloque as duas versões.
+
 ## Rodar
 
 ```bash
@@ -105,8 +107,8 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 
 | | Criaturas | Ao cair |
 |---|---|---|
-| Peregrino | 70% vida, 60% dano | volta ao início do capítulo mantendo a experiência |
-| Caçador | normal | volta ao início do capítulo, no nível do checkpoint |
+| Peregrino | 70% vida, 60% dano | volta ao último checkpoint (início do capítulo ou último santuário) mantendo a experiência |
+| Caçador | normal | volta ao último checkpoint, no nível dele |
 | Van Helsing | +40% vida, +35% dano, mais criaturas e elites, +25% XP | igual ao Caçador |
 | Pesadelo | +80% vida, +70% dano, +50% XP | o save é apagado (fica só o recorde) |
 
@@ -114,7 +116,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 
 **Santuários e mercador:** os 8 santuários de beira de estrada (✝ dourado no minimapa) são pontos de descanso: **E** (toque no aviso, ou ↑ no controle) para rezar — vida, stamina e virotes cheios e o progresso é salvo ali, então ao cair você volta ao último santuário. Cada santuário atende uma vez por noite (a luz fica fraca depois). As almas (✦ no HUD) são também moeda: o **mercador** na praça de Borgo (¤ no minimapa) vende Erva Verde (8), Erva Vermelha (10), Água Benta (18) e Ervas Mistas V+R (30). O jogo pausa enquanto a loja está aberta (1-4 / ← → Enter / toque / controle).
 
-**Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo (posição, hora do dia, nível, dons, inventário). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
+**Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo e ao rezar num santuário (posição, hora do dia, nível, dons, inventário, almas). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
 
 ## Estrutura
 

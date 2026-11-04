@@ -2,6 +2,7 @@
 import { DIFFICULTIES, loadSave, loadRecords, loadPrefs, savePrefs, newSave, rankOf } from './progress.js';
 import { CHAPTERS, roman } from './campaign.js';
 import './campaign.css';
+import { L } from './i18n.js';
 
 const fmtTime = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s / 60) % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}min`);
 
@@ -38,23 +39,23 @@ export class HuntMenu {
     let html = '';
     if (s && !this.fresh) {
       const ch = CHAPTERS[s.chapter];
-      const cycle = s.cycle ? `Ciclo ${roman(s.cycle + 1)} · ` : '';
-      html += `<div class="slot"><b>${cycle}Capítulo ${roman(s.chapter + 1)} — ${ch.title}</b>` +
-        `<span>Nível ${s.level} · ${rankOf(s.level).name} · ${DIFFICULTIES[s.difficulty].name} · ${fmtTime(s.stats.time)}</span></div>` +
-        '<button type="button" class="link" data-act="new">Nova caçada</button>';
-      this.play.textContent = 'CONTINUAR';
+      const cycle = s.cycle ? `${L('Ciclo', 'Cycle')} ${roman(s.cycle + 1)} · ` : '';
+      html += `<div class="slot"><b>${cycle}${L('Capítulo', 'Chapter')} ${roman(s.chapter + 1)} — ${ch.title}</b>` +
+        `<span>${L('Nível', 'Level')} ${s.level} · ${rankOf(s.level).name} · ${DIFFICULTIES[s.difficulty].name} · ${fmtTime(s.stats.time)}</span></div>` +
+        `<button type="button" class="link" data-act="new">${L('Nova caçada', 'New hunt')}</button>`;
+      this.play.textContent = L('CONTINUAR', 'CONTINUE');
     } else {
-      html += '<div class="diffs" role="radiogroup" aria-label="Dificuldade">' +
+      html += `<div class="diffs" role="radiogroup" aria-label="${L('Dificuldade', 'Difficulty')}">` +
         Object.entries(DIFFICULTIES).map(([k, d]) =>
           `<button type="button" role="radio" data-diff="${k}" aria-checked="${k === this.diff}">${d.name}</button>`).join('') +
         `</div><p class="diff-desc">${DIFFICULTIES[this.diff].desc}</p>`;
-      if (s) html += `<p class="warn">Isso substitui o save atual (Capítulo ${roman(s.chapter + 1)}, nível ${s.level}).</p>` +
-        '<button type="button" class="link" data-act="back">Voltar ao save</button>';
-      this.play.textContent = 'CAÇAR';
+      if (s) html += L(`<p class="warn">Isso substitui o save atual (Capítulo ${roman(s.chapter + 1)}, nível ${s.level}).</p>`, `<p class="warn">This replaces the current save (Chapter ${roman(s.chapter + 1)}, level ${s.level}).</p>`) +
+        `<button type="button" class="link" data-act="back">${L('Voltar ao save', 'Back to the save')}</button>`;
+      this.play.textContent = L('CAÇAR', 'HUNT');
     }
     if (rec.chapter > 0) {
       const c = Math.floor(rec.chapter / CHAPTERS.length), n = rec.chapter % CHAPTERS.length;
-      html += `<p class="record">Recorde: ${c ? `Ciclo ${roman(c + 1)} · ` : ''}Capítulo ${roman(n + 1)} · Nível ${rec.level}</p>`;
+      html += `<p class="record">${L('Recorde', 'Record')}: ${c ? `${L('Ciclo', 'Cycle')} ${roman(c + 1)} · ` : ''}${L('Capítulo', 'Chapter')} ${roman(n + 1)} · ${L('Nível', 'Level')} ${rec.level}</p>`;
     }
     this.el.innerHTML = html;
   }
