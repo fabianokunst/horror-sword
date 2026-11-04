@@ -16,7 +16,7 @@ export const DIFFICULTIES = {
 // Titles earned by level; the blade, lantern and slashes take the rank's color.
 export const RANKS = [
   { level: 1, name: 'Aprendiz', color: 0x40e8ff, finisher: 0xff70e0 },
-  { level: 5, name: 'Caçador', color: 0xffc040, finisher: 0xff8030 },
+  { level: 5, name: 'Juramentado', color: 0xffc040, finisher: 0xff8030 },
   { level: 10, name: 'Matador de Vampiros', color: 0xff3050, finisher: 0xffb040 },
   { level: 15, name: 'Inquisidor', color: 0xb060ff, finisher: 0x60e8ff },
   { level: 22, name: 'Lenda da Noite', color: 0xf4f8ff, finisher: 0xffd060 },

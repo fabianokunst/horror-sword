@@ -154,6 +154,8 @@ function showWin() {
   state = 'win';
   document.exitPointerLock?.();
   hud.show(false);
+  hud.hidePerks(); // a level gained from the victory bonus is offered again once the next cycle starts
+  deadUi.classList.add('hidden');
   touch.show(false);
   document.getElementById('winStats').innerHTML = campaign.victoryReport();
   winBtn.textContent = `CICLO ${roman(campaign.save.cycle + 1)}`;

@@ -302,7 +302,8 @@ export class Enemies {
     }
 
     const dx = player.pos.x - pos.x, dz = player.pos.z - pos.z, dist = Math.hypot(dx, dz) || 0.001;
-    if (dist > 120) return true;
+    // stragglers despawn, but the Count and named guardians hunt the player down instead of vanishing
+    if (dist > 120 && !T.boss && !e.name) return true;
     const ground = groundAt(pos.x, pos.z);
 
     // sunlight burns the undead

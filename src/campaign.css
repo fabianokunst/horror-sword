@@ -74,6 +74,8 @@
 }
 
 /* ------------------------------------------------------------------ level-up */
+/* the chapter banner would bleed through the level-up title */
+body:has(#levelup:not(.hidden)) #msg { visibility: hidden; }
 #levelup { z-index: 5; background: radial-gradient(ellipse at center, rgba(10, 20, 30, 0.6), rgba(0, 0, 0, 0.88)); }
 #levelup h1 { color: #90f0ff; text-shadow: 4px 4px 0 #00202a, 0 0 30px rgba(80, 220, 255, 0.5); }
 #luHint { font-size: clamp(17px, min(2.6vw, 4.2vh), 24px); color: #c8b8a0; margin-bottom: clamp(10px, 2.5vh, 20px); }

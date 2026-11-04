@@ -104,7 +104,9 @@ export class Campaign {
     this.applyScaling();
     this.restoreWorld();
     this.setupChapter();
-    if (save.inventory) this.inv?.load?.(save.inventory);
+    // the untouched inventory of the first start is the kit every brand-new hunt begins with
+    this.freshInv ??= this.inv?.save?.();
+    this.inv?.load?.(save.inventory || this.freshInv);
     if (!save.savedAt) this.checkpoint(false); // a brand-new hunt is saved right away
     if (save.cycle > 0 && save.chapter === 0) this.hud.message(`CICLO ${roman(save.cycle + 1)}`, 'As criaturas retornam mais fortes...', 4);
     this.announce();
