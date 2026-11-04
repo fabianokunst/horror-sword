@@ -10,6 +10,9 @@ export const COMBO = [
   { dur: 0.46, hitAt: 0.5, dmg: 2.5, range: 3.8, arc: 0.4, pose: (e) => [-1.8 + 3.0 * e, 0.15], twist: () => 0, vertical: true },
 ];
 
+// sword damage while the counter window after a perfect dodge is open
+export const COUNTER_MUL = 1.75;
+
 const lerpAngle = (a, b, t) => {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (d < -Math.PI) d += Math.PI * 2;
@@ -48,6 +51,7 @@ export class Player {
     this.deadT = 0;
     this.phase = 0;
     this.flash = 0;
+    this.counter = 0; // seconds left of the counter window opened by a perfect dodge
     this.onSwing = null;
     this.light = new THREE.PointLight(0x70d8ff, 2.2, 12, 1);
     scene.add(this.light);
@@ -83,7 +87,14 @@ export class Player {
     this.dead = false;
     this.deadT = 0;
     this.flash = 0;
+    this.counter = 0;
     if (this.m.spin) this.m.spin.rotation.set(0, 0, 0);
+  }
+
+  // A blow dodged at the last instant: stamina back and a window of stronger sword hits.
+  perfectDodge(window) {
+    this.counter = window;
+    this.stamina = Math.min(this.stats.maxSt, this.stamina + 25);
   }
 
   tryAttack(aim) {
@@ -143,6 +154,7 @@ export class Player {
     const m = this.m, pos = this.pos, vel = this.vel, s = this.stats;
     this.invuln = Math.max(0, this.invuln - dt);
     this.shootCd = Math.max(0, this.shootCd - dt);
+    this.counter = Math.max(0, this.counter - dt);
     if (this.bolts < s.maxBolts && (this.boltTimer += dt) > s.boltReload) { this.bolts++; this.boltTimer = 0; }
 
     let tx = 0, tz = 0;
@@ -163,11 +175,13 @@ export class Player {
       const sprint = mv.sprint && moveLen > 0 && this.stamina > 1 && !this.swimming && !this.attack;
       let speed = (this.swimming ? 3 : sprint ? 10.5 : 6.5) * s.speedMul;
       if (this.attack) speed = 1.5;
+      // mv.face: a locked target the hunter keeps facing while walking (sprinting breaks it)
+      const face = sprint ? null : mv.face ?? null;
       if (moveLen > 0) {
         tx = (mv.x / moveLen) * speed;
         tz = (mv.z / moveLen) * speed;
-        if (!this.attack) this.facing = lerpAngle(this.facing, Math.atan2(mv.x, mv.z), 1 - Math.exp(-14 * dt));
-      }
+        if (!this.attack) this.facing = lerpAngle(this.facing, face ?? Math.atan2(mv.x, mv.z), 1 - Math.exp(-14 * dt));
+      } else if (face != null && !this.attack) this.facing = lerpAngle(this.facing, face, 1 - Math.exp(-10 * dt));
       if (sprint) { this.stamina -= 20 * dt; this.stDelay = 0.4; }
       if (mv.jump && this.grounded && !this.swimming && !this.attack) { vel.y = 8.5; this.grounded = false; }
     }
@@ -210,8 +224,9 @@ export class Player {
       if (!a.hit && p >= d.hitAt) {
         a.hit = true;
         // listeners get a scaled copy, so buffs can tweak it without touching COMBO
-        const dmg = d.dmg * s.swordMul * (a.combo === 2 ? s.finisherMul : 1);
-        this.onSwing?.(a.combo, { ...d, dmg, range: d.range * s.rangeMul });
+        const counter = this.counter > 0;
+        const dmg = d.dmg * s.swordMul * (a.combo === 2 ? s.finisherMul : 1) * (counter ? COUNTER_MUL : 1);
+        this.onSwing?.(a.combo, { ...d, dmg, range: d.range * s.rangeMul, counter });
       }
       if (p >= 1) {
         if (this.queued && a.combo < 2 && this.stamina > 0) this.startSwing(a.combo + 1, this.pendingAim);

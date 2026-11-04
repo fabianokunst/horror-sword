@@ -4,13 +4,14 @@ const RECORD_KEY = 'horror-sword:records';
 const PREFS_KEY = 'horror-sword:prefs';
 const VERSION = 1;
 
-// hp/dmg scale every creature, spawn scales how many are alive at once, elite adds to the elite chance.
+// hp/dmg scale every creature, spawn scales how many are alive at once, elite adds to the elite chance,
+// attackers is how many creatures may strike at the same time (the others circle and wait).
 // keepXp: dying keeps what was earned since the checkpoint; permadeath: dying erases the save.
 export const DIFFICULTIES = {
-  easy: { name: 'Peregrino', desc: 'Criaturas frágeis. Ao cair, você mantém a experiência.', hp: 0.7, dmg: 0.6, spawn: 0.75, elite: -0.05, xp: 1, keepXp: true },
-  normal: { name: 'Caçador', desc: 'A caçada como deve ser. Ao cair, volta ao início do capítulo.', hp: 1, dmg: 1, spawn: 1, elite: 0, xp: 1 },
-  hard: { name: 'Van Helsing', desc: 'Mais criaturas, mais fortes e mais elites. +25% de experiência.', hp: 1.4, dmg: 1.35, spawn: 1.2, elite: 0.05, xp: 1.25 },
-  nightmare: { name: 'Pesadelo', desc: 'Uma vida só. Ao cair, o save é apagado. +50% de experiência.', hp: 1.8, dmg: 1.7, spawn: 1.4, elite: 0.1, xp: 1.5, permadeath: true },
+  easy: { name: 'Peregrino', desc: 'Criaturas frágeis. Ao cair, você mantém a experiência.', hp: 0.7, dmg: 0.6, spawn: 0.75, elite: -0.05, xp: 1, attackers: 2, keepXp: true },
+  normal: { name: 'Caçador', desc: 'A caçada como deve ser. Ao cair, volta ao início do capítulo.', hp: 1, dmg: 1, spawn: 1, elite: 0, xp: 1, attackers: 3 },
+  hard: { name: 'Van Helsing', desc: 'Mais criaturas, mais fortes e mais elites. +25% de experiência.', hp: 1.4, dmg: 1.35, spawn: 1.2, elite: 0.05, xp: 1.25, attackers: 3 },
+  nightmare: { name: 'Pesadelo', desc: 'Uma vida só. Ao cair, o save é apagado. +50% de experiência.', hp: 1.8, dmg: 1.7, spawn: 1.4, elite: 0.1, xp: 1.5, attackers: 4, permadeath: true },
 };
 
 // Titles earned by level; the blade, lantern and slashes take the rank's color.

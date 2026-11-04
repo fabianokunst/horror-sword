@@ -15,8 +15,11 @@ import { Campaign, roman } from './campaign.js';
 import { HuntMenu } from './menu.js';
 import { initAudio, sfx, updateAmbient, setListener, setPaused, toggleMute, isMuted } from './audio.js';
 import { Settings } from './settings.js';
+import { LockOn } from './lockon.js';
 
 const CYCLE = 240; // seconds for a full day/night
+// perfect dodge: creatures crawl at WITCH_SLOW speed for WITCH real seconds, the blade hits harder a bit longer
+const WITCH = 1.1, WITCH_SLOW = 0.25;
 const FOV = 62; // vertical, for landscape screens
 const MIN_HFOV = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * 4 / 3); // what a 4:3 screen sees
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -98,6 +101,8 @@ const input = new Input(renderer.domElement);
 const touch = new TouchControls(input);
 const hud = new Hud();
 const inv = new Inventory(scene, player, fx, renderer);
+const lock = new LockOn(scene);
+lock.btn = document.querySelector('#touch [data-key="KeyR"]');
 
 const spawnPt = findSpawn();
 player.pos.set(spawnPt.x, heightAt(spawnPt.x, spawnPt.z), spawnPt.z);
@@ -107,25 +112,35 @@ world.update(player.pos.x, player.pos.z, 0, true);
 let state = 'menu';
 let camYaw = player.facing + Math.PI, camPitch = 0.32;
 let dayT = 0.44, night = 0, wasNight = false, draculaNight = -1, hitstop = 0, deadTimer = 0, elapsed = 0;
-let dayAmt = 1, bloodMoon = false;
+let dayAmt = 1, bloodMoon = false, witch = 0;
 
 enemies.onPlayerHit = () => {
   sfx.hurt(); hud.hurt(); fx.shake += 0.5; player.flash = 0.1;
   if (input.touch) navigator.vibrate?.(60);
+};
+// a roll at the last instant before a blow: slow motion for the creatures and a counter window for the blade
+enemies.onPerfectDodge = () => {
+  witch = WITCH;
+  player.perfectDodge(WITCH + 0.5);
+  sfx.perfect();
+  fx.burst(player.pos.clone().setY(player.pos.y + 1), player.rank.color, 24, { speed: 6, up: 2, gravity: 0, life: 0.5, size: 0.12 });
+  hud.toast('✦ Esquiva perfeita — contra-ataque!');
+  if (input.touch) navigator.vibrate?.(30);
 };
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
 enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); };
 player.onSwing = (combo, def) => {
   sfx.swing(combo);
-  fx.slash(player.pos, player.facing, def.vertical, combo === 2 ? player.rank.finisher : player.rank.color);
+  const heavy = def.vertical || def.counter; // counter hits after a perfect dodge land like the finisher
+  fx.slash(player.pos, player.facing, def.vertical, combo === 2 || def.counter ? player.rank.finisher : player.rank.color);
   const hits = enemies.hitArc(player, inv.damageMul > 1 ? { ...def, dmg: def.dmg * inv.damageMul } : def);
   if (hits) player.heal(hits * player.stats.lifesteal); // "Sede de Sangue" perk
   const n = hits + world.hitCoffins(player, def, fx);
   if (n > 0) {
-    sfx.hit(def.vertical);
-    hitstop = def.vertical ? 0.09 : 0.05;
-    fx.shake += def.vertical ? 0.45 : 0.25;
+    sfx.hit(heavy);
+    hitstop = heavy ? 0.09 : 0.05;
+    fx.shake += heavy ? 0.45 : 0.25;
   }
 };
 
@@ -201,7 +216,9 @@ function resume() {
 function startRun(save) {
   huntMenu.close();
   finalFight = false;
-  hitstop = deadTimer = 0;
+  hitstop = deadTimer = witch = 0;
+  enemies.timeScale = 1;
+  lock.release();
   dayT = campaign.start(save);
   night = save.stats.nights || 0;
   wasNight = Math.sin(dayT * Math.PI * 2) * 0.9 - 0.2 < -0.05; // same test as updateSky, so no false nightfall
@@ -405,6 +422,8 @@ function audioFrame(dt, time) {
 const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
 const camDir = new THREE.Vector3();
+const camLook = new THREE.Vector3();
+const witchTint = new THREE.Vector3();
 
 function frame() {
   requestAnimationFrame(frame);
@@ -415,23 +434,34 @@ function frame() {
   if (hitstop > 0) { hitstop -= rawDt; dt = rawDt * 0.05; }
 
   if (state === 'play' || state === 'dead') {
+    // slow motion after a perfect dodge, easing back to full speed over its last quarter second
+    if (witch > 0) witch = Math.max(0, witch - rawDt);
+    enemies.timeScale = witch > 0.25 ? WITCH_SLOW : WITCH_SLOW + (1 - WITCH_SLOW) * (1 - witch / 0.25);
+    // target lock: drops dead/far targets; while locked, a sideways flick of the look input switches target
+    lock.update(rawDt, { player, enemies, lookDx: state === 'play' ? input.dx : 0, camYaw, color: player.rank.color, time });
     if (state === 'play') {
       // before any input is read: held on-screen buttons re-press their keys this frame
       if (input.touch) touch.update(rawDt, player);
-      camYaw -= input.dx * 0.0024;
+      if (lock.target) {
+        // the camera swings to look past the hunter at the target (gently when it is right on top of us)
+        const d = Math.hypot(lock.target.pos.x - player.pos.x, lock.target.pos.z - player.pos.z);
+        camYaw = lerpAngle(camYaw, lock.yaw(player), 1 - Math.exp(-6 * Math.min(1, d / 3) * rawDt));
+      } else camYaw -= input.dx * 0.0024;
       camPitch = Math.min(1.2, Math.max(-0.3, camPitch + input.dy * 0.0024));
     }
     let f = (input.down('KeyW') ? 1 : 0) - (input.down('KeyS') ? 1 : 0);
     let r = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
     if (input.stick.x || input.stick.y) { f = -input.stick.y; r = input.stick.x; }
     // touch: with one thumb on the stick, lazily swing the camera behind the hunter while running forward
-    if (state === 'play' && input.touch && !input.looking && f > 0.3 && !player.attack && !player.roll)
+    if (state === 'play' && input.touch && !lock.target && !input.looking && f > 0.3 && !player.attack && !player.roll)
       camYaw = lerpAngle(camYaw, player.facing + Math.PI, 1 - Math.exp(-1.2 * dt));
     const mv = {
       x: -Math.sin(camYaw) * f + Math.cos(camYaw) * r,
       z: -Math.cos(camYaw) * f - Math.sin(camYaw) * r,
       sprint: input.down('ShiftLeft') || input.down('ShiftRight') || input.sprint,
       jump: input.hit('Space'),
+      // locked on: keep facing the target while walking or standing (player.js lets sprinting break it)
+      face: lock.target ? Math.atan2(lock.target.pos.x - player.pos.x, lock.target.pos.z - player.pos.z) : null,
     };
     if (state !== 'play') mv.x = mv.z = 0;
     const camAim = Math.atan2(-Math.sin(camYaw), -Math.cos(camYaw));
@@ -439,8 +469,9 @@ function frame() {
     if (state === 'play') {
       // without pointer lock the browser never reports Esc as a lock change, so pause by key here
       if (!input.locked && (input.hit('Escape') || input.hit('KeyP'))) pause();
+      if (input.hit('KeyR')) lock.toggle(player, enemies, camAim);
       if (input.hit('Mouse0')) {
-        const t = enemies.target(player, camAim, 6, 1.3);
+        const t = lock.target || enemies.target(player, camAim, 6, 1.3);
         const aim = t ? Math.atan2(t.pos.x - player.pos.x, t.pos.z - player.pos.z)
           : Math.hypot(mv.x, mv.z) > 0 ? Math.atan2(mv.x, mv.z) : camAim;
         player.tryAttack(aim);
@@ -451,7 +482,7 @@ function frame() {
       }
       if ((input.hit('KeyQ') || input.hit('KeyF') || input.hit('Mouse1')) && player.tryShoot()) {
         const from = player.pos.clone().setY(player.pos.y + 1.5);
-        const t = enemies.target(player, camAim, 40, input.touch ? 0.6 : 0.35); // thumbs aim worse than mice
+        const t = lock.target || enemies.target(player, camAim, 40, input.touch ? 0.6 : 0.35); // thumbs aim worse than mice
         const dir = t
           ? new THREE.Vector3(t.pos.x, t.pos.y + (t.T.center ?? 1.1 * (t.T.scale || 1)), t.pos.z).sub(from)
           : camera.getWorldDirection(camDir).clone();
@@ -466,6 +497,11 @@ function frame() {
 
     if (!(finalFight && enemies.boss)) dayT = (dayT + dt / CYCLE) % 1; // the final duel stays at midnight
     const isNight = updateSky(dt);
+    if (witch > 0) {
+      // slow motion reads as a cold, drained picture
+      const k = Math.min(1, witch / 0.25);
+      retro.material.uniforms.uTint.value.multiply(witchTint.set(1 - 0.2 * k, 1 - 0.06 * k, 1 + 0.12 * k));
+    }
     if (state === 'play') campaign.update(dt, { dayT, isNight });
     if (world.gate.open && !finalFight && !player.dead && world.inArena(player.pos.x, player.pos.z)) startFinalFight();
 
@@ -534,6 +570,8 @@ function frame() {
     camera.position.x += (Math.random() - 0.5) * s;
     camera.position.y += (Math.random() - 0.5) * s;
   }
+  // locked on: aim a little toward the target so flying creatures stay in frame
+  if (lock.target && state === 'play') camTarget.lerp(lock.center(camLook), 0.2);
   camera.lookAt(camTarget);
 
   retro.render(scene, camera);
@@ -542,5 +580,8 @@ function frame() {
 frame();
 
 if (import.meta.env.DEV) {
-  window.__hs = { player, enemies, world, sfx, campaign, setDay: (t) => (dayT = t), setNight: (n) => (night = n) };
+  window.__hs = {
+    player, enemies, world, sfx, campaign, lock, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    state: () => state, witch: () => witch, cam: () => camYaw,
+  };
 }

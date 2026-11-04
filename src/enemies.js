@@ -19,6 +19,14 @@ const ORB_MAT = basic(0x80f0ff, 2.2);
 const BOLT_GEO = new THREE.BoxGeometry(0.05, 0.05, 0.7);
 const BOLT_MAT = basic(0xc0f8ff, 2.5);
 
+// Telegraphs: when a strike (or a werewolf pounce) starts winding up, the body flashes red for an instant
+// and a red glint burns in the eyes until the blow lands, so the dodge can be read, not only heard.
+const TELL_MAT = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.3, 0.18) });
+const TELL_FLASH = 0.09;
+const CROUCH = 0.35; // werewolves crouch this long before pouncing
+// A roll that starts this close to the moment a blow lands is a perfect dodge (see strike()).
+const PERFECT = 0.25;
+
 // roaming creatures when no campaign chapter is driving the spawns
 const DEFAULT_SPAWN = { max: 8, interval: 2.6, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul', 'wolf'] };
 
@@ -43,8 +51,14 @@ export class Enemies {
     this.boss = null;
     this.onKill = null;
     this.onSoul = null;
-    // set by the campaign: difficulty x chapter scaling, elite odds and XP per soul
-    this.mods = { hp: 1, dmg: 1, elite: 0, xp: 1 };
+    this.onPerfectDodge = null;
+    // set by the campaign: difficulty x chapter scaling, elite odds, XP per soul and how many creatures
+    // may attack at once (the rest circle the hunter and wait their turn)
+    this.mods = { hp: 1, dmg: 1, elite: 0, xp: 1, attackers: 3 };
+    this.attackers = 0;
+    // < 1 slows the creatures only (the slow motion after a perfect dodge); bolts and souls keep full speed
+    this.timeScale = 1;
+    this.clock = 0;
   }
 
   // Scales a fresh creature to the current chapter; some come back as glowing elites.
@@ -101,9 +115,15 @@ export class Enemies {
       type, T, m, hp: T.hp,
       pos: new THREE.Vector3(x, groundAt(x, z) + (T.fly || 0), z),
       kx: 0, kz: 0, facing: 0, phase: Math.random() * 10, cd: 1, atk: -1, struck: false,
-      stun: 0, flash: 0, dying: 0, blinkCd: 2 + Math.random() * 4, leapCd: 2, leap: null,
-      burn: 0, speedMul: 0.85 + Math.random() * 0.3,
+      stun: 0, flash: 0, dying: 0, blinkCd: 2 + Math.random() * 4, leapCd: 2, leap: null, crouch: 0,
+      burn: 0, speedMul: 0.85 + Math.random() * 0.3, tell: 0, side: Math.random() < 0.5 ? 1 : -1,
     };
+    // the eye glint, parented to the head (bats: the body) so it follows the animation
+    e.glint = glowSprite(0xff3a1a, 1, 0.95);
+    e.glint.visible = false;
+    if (m.head) { m.head.add(e.glint); e.glint.position.set(0, 0.11, 0.17); }
+    else if (m.body) { m.body.add(e.glint); e.glint.position.set(0, 0.06, 0.36); }
+    else { m.root.add(e.glint); e.glint.position.y = T.center ?? 1.6; }
     this.applyMods(e);
     this.list.push(e);
     if (T.boss) this.boss = e;
@@ -120,6 +140,7 @@ export class Enemies {
     e.kx = dirX * k;
     e.kz = dirZ * k;
     e.atk = -1;
+    e.crouch = 0; // a hit interrupts a werewolf about to pounce
     const p = e.pos.clone().setY(centerY(e));
     this.fx.burst(p, e.T.blood, 14, { speed: 5, up: 4 });
     this.fx.burst(p, 0xffffff, 3, { speed: 7, up: 2, life: 0.2, size: 0.08 });
@@ -188,11 +209,27 @@ export class Enemies {
     return best;
   }
 
+  // A blow lands. If the hunter rolled in the last instant (and was close enough to have been hit),
+  // it is a perfect dodge: no damage, and main.js answers with slow motion and a counter window.
+  strike(e, player, inReach, nearMiss) {
+    const r = player.roll;
+    if (r && !r.perfect && r.t < PERFECT && (inReach || nearMiss)) {
+      r.perfect = true;
+      this.onPerfectDodge?.(e);
+      return;
+    }
+    if (inReach && player.hurt(e.dmg, e.pos.x, e.pos.z)) this.onPlayerHit?.(e.dmg);
+  }
+
   // --- per frame
   update(dt, ctx) {
-    const { player, dayAmt, time, world, spawn: S = DEFAULT_SPAWN } = ctx;
+    const { player, dayAmt, world, spawn: S = DEFAULT_SPAWN } = ctx;
     this.world = world;
     const nightAmt = 1 - dayAmt;
+    const realDt = dt;
+    dt *= this.timeScale; // creatures (and their spawning) live in the slowed time
+    this.clock += dt;
+    const time = this.clock;
 
     // spawning: the campaign chapter decides who roams, how many and how often
     this.spawnTimer -= dt;
@@ -223,6 +260,10 @@ export class Enemies {
         }
       }
 
+    // attack tokens: only a few creatures (bosses aside) wind up a strike or a pounce at the same time
+    this.attackers = 0;
+    for (const e of L) if (!e.dying && !e.T.boss && (e.atk >= 0 || e.leap || e.crouch > 0)) this.attackers++;
+
     for (let i = L.length - 1; i >= 0; i--) {
       const e = L[i];
       if (this.updateOne(e, dt, player, dayAmt, time, world)) {
@@ -232,6 +273,9 @@ export class Enemies {
       }
     }
     if (!this.boss) this.boss = L.find((e) => e.name && !e.dying) || null;
+
+    // soul orbs and bolts belong to the hunter: they ignore the slow motion
+    dt = realDt;
 
     // soul orbs
     for (let i = this.orbs.length - 1; i >= 0; i--) {
@@ -291,6 +335,7 @@ export class Enemies {
     const T = e.T, m = e.m, pos = e.pos;
     const sc = T.scale || 1;
     if (e.dying) {
+      e.glint.visible = false;
       e.dying += dt;
       const k = Math.min(1, e.dying * 3);
       if (T.fly) { pos.y = Math.max(groundAt(pos.x, pos.z), pos.y - dt * 8); m.spin.rotation.z += dt * 10; }
@@ -315,10 +360,18 @@ export class Enemies {
       if (e.hp <= 0) { this.kill(e); return false; }
     }
 
+    // a free attack slot (bosses never wait for one)
+    const free = T.boss || this.attackers < this.mods.attackers;
     let speed = 0;
     let mx = 0, mz = 0;
     if (e.stun > 0) {
       e.stun -= dt;
+    } else if (e.crouch > 0) {
+      // the werewolf gathers itself (eyes glinting), then pounces at where the hunter is now
+      if ((e.crouch -= dt) <= 0) {
+        e.crouch = 0;
+        e.leap = { t: 0, x0: pos.x, z0: pos.z, x1: player.pos.x - (dx / dist) * 1.2, z1: player.pos.z - (dz / dist) * 1.2 };
+      }
     } else if (e.leap) {
       const l = e.leap;
       l.t += dt;
@@ -329,7 +382,8 @@ export class Enemies {
       if (p >= 1) {
         e.leap = null;
         e.leapY = 0;
-        if (Math.hypot(player.pos.x - pos.x, player.pos.z - pos.z) < 2.2 && player.hurt(e.dmg, pos.x, pos.z)) this.onPlayerHit?.(e.dmg);
+        const d = Math.hypot(player.pos.x - pos.x, player.pos.z - pos.z);
+        this.strike(e, player, d < 2.2, d < 4.7);
         this.fx.burst(pos.clone().setY(ground + 0.1), 0x6a5a40, 10, { speed: 4, up: 2 });
         e.cd = 1;
       }
@@ -339,7 +393,7 @@ export class Enemies {
         e.struck = true;
         const reach = T.range + 0.8 * sc;
         const dy = Math.abs(player.pos.y + 1 - centerY(e));
-        if (dist < reach && dy < 2.5 && player.hurt(e.dmg, pos.x, pos.z)) this.onPlayerHit?.(e.dmg);
+        this.strike(e, player, dist < reach && dy < 2.5, dist < reach + 2.5 && dy < 3);
         if (T.fly) { e.kx = (-dx / dist) * 10; e.kz = (-dz / dist) * 10; }
       }
       if (e.atk >= T.windup + 0.3) {
@@ -351,18 +405,32 @@ export class Enemies {
       speed = T.speed * e.speedMul;
       mx = dx / dist;
       mz = dz / dist;
-      if (T.fly && dist > 7) {
+      // no free slot and already close: circle the hunter at the edge of the fight and wait for a turn
+      const wait = !free && !player.dead && dist < T.range + (T.fly ? 6 : 3.4) * sc;
+      if (T.fly && dist > 7 && !wait) {
         // circle around the player before swooping in
         const side = Math.sin(time * 0.8 + e.phase) > 0 ? 1 : -1;
         mx += (-dz / dist) * 0.8 * side;
         mz += (dx / dist) * 0.8 * side;
       }
-      if (dist < T.range + 0.3 * sc) {
+      if (wait) {
+        const ring = T.range + (T.fly ? 4.5 : 2.2) * sc;
+        const radial = dist < ring ? -1 : 0.15; // back off when inside the ring, drift in when outside
+        mx = (-dz / dist) * e.side + (dx / dist) * radial;
+        mz = (dx / dist) * e.side + (dz / dist) * radial;
+        speed *= 0.4;
+      } else if (dist < T.range + 0.3 * sc) {
         speed = 0;
-        if (e.cd <= 0 && !player.dead) { e.atk = 0; e.struck = false; sfx.attack(e.type, pos); }
+        if (e.cd <= 0 && !player.dead && free) {
+          e.atk = 0;
+          e.struck = false;
+          e.tell = TELL_FLASH;
+          if (!T.boss) this.attackers++;
+          sfx.attack(e.type, pos);
+        }
       }
       // vampires dissolve into mist and reappear behind the hunter
-      if (T.blink && (e.blinkCd -= dt) <= 0 && dist > 6 && dist < 35 && !player.dead) {
+      if (T.blink && (e.blinkCd -= dt) <= 0 && free && dist > 6 && dist < 35 && !player.dead) {
         this.fx.burst(pos.clone().setY(pos.y + 1), 0x8a2ad0, 26, { speed: 3, up: 2, gravity: 1, life: 0.8, size: 0.2 });
         const a = player.facing + Math.PI + (Math.random() - 0.5) * 1.4;
         pos.x = player.pos.x + Math.sin(a) * 3.2;
@@ -374,9 +442,11 @@ export class Enemies {
         // the count summons bats when he blinks
         if (T.boss) for (let i = 0; i < 3; i++) this.spawn('bat', pos.x, pos.z, 4, 8);
       }
-      if (T.leap && (e.leapCd -= dt) <= 0 && dist > 4 && dist < 11) {
-        e.leap = { t: 0, x0: pos.x, z0: pos.z, x1: player.pos.x - (dx / dist) * 1.2, z1: player.pos.z - (dz / dist) * 1.2 };
+      if (T.leap && (e.leapCd -= dt) <= 0 && free && dist > 4 && dist < 11 && !player.dead) {
+        e.crouch = CROUCH;
+        e.tell = TELL_FLASH;
         e.leapCd = 3 + Math.random() * 2;
+        this.attackers++;
         sfx.leap(pos);
       }
     }
@@ -391,7 +461,7 @@ export class Enemies {
 
     const g = groundAt(pos.x, pos.z);
     if (T.fly) {
-      const swoop = e.atk >= 0 || (dist < 7 && e.cd <= 0.2);
+      const swoop = e.atk >= 0 || (dist < 7 && e.cd <= 0.2 && free);
       const ty = swoop ? player.pos.y + 1.1 - (T.center || 0) : Math.max(g, WATER) + T.fly + Math.sin(time * 2 + e.phase) * 0.5;
       pos.y += (ty - pos.y) * Math.min(1, dt * 4);
     } else pos.y = g + (e.leapY || 0);
@@ -440,12 +510,22 @@ export class Enemies {
     if (m.tail) m.tail.rotation.y = Math.sin(time * 8 + e.phase) * 0.4;
     if (m.tail2) m.tail2.rotation.y = Math.sin(time * 8 + e.phase - 0.8) * 0.5;
     if (e.leap) m.spin.rotation.x = -0.6;
+    else if (e.crouch > 0) m.spin.rotation.x = 0.4;
     else m.spin.rotation.x = e.type === 'bride' ? 0.35 : 0;
+
+    // telegraph: a red flash as the windup starts, then the eye glint swells until the blow lands
+    const winding = (e.atk >= 0 && e.atk < T.windup) || e.crouch > 0;
+    e.glint.visible = winding;
+    if (winding) {
+      const p = e.crouch > 0 ? 1 - e.crouch / CROUCH : e.atk / T.windup;
+      e.glint.scale.setScalar((0.2 + 0.5 * Math.min(1, p * 4)) * (1.15 - 0.25 * p));
+    }
 
     m.root.position.copy(pos);
     m.root.rotation.y = e.facing;
     if (e.flash > 0) e.flash -= dt;
-    for (const mesh of m.meshes) mesh.material = e.flash > 0 ? FLASH_MAT : mesh.userData.orig;
+    if (e.tell > 0) e.tell -= dt;
+    for (const mesh of m.meshes) mesh.material = e.flash > 0 ? FLASH_MAT : e.tell > 0 ? TELL_MAT : mesh.userData.orig;
     return false;
   }
 }

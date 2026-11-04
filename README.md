@@ -26,6 +26,7 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Clique esquerdo | espada (combo de 3 golpes, mira assistida) |
 | Clique direito / Ctrl / C | esquiva com invencibilidade |
 | Q / F / botão do meio | besta de prata (6 virotes, recarregam sozinhos) |
+| R | travar alvo (câmera, espada e besta miram a criatura; um movimento rápido do mouse para o lado troca de alvo) |
 | Tab / I | inventário (no celular: botão ITENS) |
 | E | pegar item brilhando no chão |
 | M | liga/desliga o som (também há o botão SOM no menu) |
@@ -41,11 +42,19 @@ Funciona de celulares pequenos (iPhone SE) a monitores ultrawide, em paisagem ou
 | Arrastar no lado direito | câmera (dá para mover e girar ao mesmo tempo) |
 | Botão da espada | golpe; segure para o combo completo |
 | ESQUIVA / BESTA / PULO | como no teclado (o número na besta é a munição) |
+| ALVO | trava/solta o alvo (aceso enquanto travado); deslizar rápido no lado direito troca de alvo |
 | CORRER | liga a corrida; desliga ao soltar o analógico |
 | ITENS / ❚❚ | inventário / pausa |
 | Toque no aviso do item | pegar item |
 
 Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisagem). Se o app for para segundo plano, o jogo pausa. Usar mouse/teclado ou toque no meio da partida troca o esquema de controle automaticamente.
+
+## Combate
+
+- **Aviso de golpe:** quando uma criatura começa um ataque, o corpo pisca em vermelho e um brilho vermelho acende nos olhos até o golpe cair (além do som de aviso). O lobisomem se agacha antes do salto e pula para onde você estava no fim do agachamento.
+- **Vez de atacar:** só algumas criaturas atacam ao mesmo tempo; as outras rondam em volta esperando a vez. Peregrino 2, Caçador 3, Van Helsing 3, Pesadelo 4, e +1 por ciclo de novo jogo+ (até +2). Chefes não esperam.
+- **Esquiva perfeita:** esquivar no último instante antes do golpe (até 0,25 s antes) deixa as criaturas em câmera lenta por ~1 s (a imagem esfria), devolve stamina e abre uma janela de contra-ataque em que a espada causa 1,75× de dano.
+- **Travar alvo:** R (ALVO no toque) trava a criatura para onde a câmera aponta ou a mais próxima. A câmera acompanha, o caçador fica de frente para ela ao andar (correr quebra) e espada e besta miram nela. Quando ela morre, a trava passa para a criatura mais próxima; longe demais (34 m), solta.
 
 ## Campanha
 
@@ -84,7 +93,8 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/characters.js` — personagens com malha contínua e esqueleto (`SkinnedMesh`): tubos e elipsoides suaves fundidos numa malha só, pesos de skinning calculados por distância aos ossos; acessórios rígidos (espada, chapéu, coroa, besta) presos aos ossos.
 - `src/models.js` — primitivas (caixa, cilindro, frontão) e `bake()` para construções e acessórios.
 - `src/player.js` — movimento, combo, esquiva, besta; atributos vindos dos dons (`applyStats`) e cor do título (`setRank`).
-- `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
+- `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
+- `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
 - `src/campaign.js` — capítulos e objetivos, escala por capítulo/ciclo, XP e level-up, checkpoints, morte por dificuldade e novo jogo+.
 - `src/progress.js` — dificuldades, dons, títulos, curva de XP e leitura/gravação do save no `localStorage`.
 - `src/menu.js`, `src/campaign.css` — painel do menu (continuar / nova caçada / dificuldade) e estilos de XP, toast e cartas de dom.
@@ -99,7 +109,7 @@ Não há nenhum arquivo de áudio: efeitos, ambiente e trilha são gerados pela 
 
 - **Espaço:** reverb de catedral gerado por código. Os sons das criaturas vêm do lado (esquerda/direita) e da distância em que estão, e soam mais abafados e com mais eco quando estão longe.
 - **Criaturas:** cada uma tem voz própria (vozes por formantes): gemido do carniçal, sibilo e grito do vampiro, guincho do morcego, lamento e cantarola da noiva, rosnado e uivo do lobisomem, risada do Conde. Cada uma tem três sons: **aviso antes do ataque** (dá tempo de esquivar), morte, e sons ocasionais quando está perto.
-- **Caçador:** golpes com brilho de lâmina rúnica (o 3º do combo é mais pesado), impacto, passos (terra/água), pulo, aterrissagem, esquiva, besta (disparo, virote cravando, recarga, clique vazio), coração batendo com pouca vida.
+- **Caçador:** golpes com brilho de lâmina rúnica (o 3º do combo é mais pesado), impacto, passos (terra/água), pulo, aterrissagem, esquiva, esquiva perfeita, trava de alvo, besta (disparo, virote cravando, recarga, clique vazio), coração batendo com pouca vida.
 - **Mundo:** sino de igreja (3 badaladas ao anoitecer), vento, grilos à noite (ficam quietos quando há monstros perto), coruja, corvos ao entardecer, pássaros de dia, trovão e dissonância na Lua de Sangue.
 - **Trilha:** generativa em Ré menor: pad, caixinha de música e, quando o perigo aumenta, tambores taiko e cordas. No duelo final entra um coro. A entrada do Conde toca, num órgão sintetizado, a abertura da *Tocata e Fuga em Ré menor* de Bach (domínio público).
 - No modo dev, `__hs.sfx.<nome>()` no console toca qualquer efeito.

@@ -337,6 +337,20 @@ const S = {
     noise(o, t, 'bandpass', 300, 1100, 0.28, 0.55, 1.2, 0.05);
     noise(o, t + 0.3, 'lowpass', 500, 150, 0.12, 0.25);
   },
+  // perfect dodge: time folds (a falling sweep), the blade rings and a deep pulse marks the slow motion
+  perfect(t) {
+    const o = out(null, 0.5);
+    noise(o, t, 'bandpass', 4200, 260, 0.7, 0.35, 3, 0.01);
+    osc(o, t, 'sine', 110, 38, 0.9, 0.5, 0.004);
+    const f = hz(86);
+    for (const [r, a] of [[1, 0.09], [1.5, 0.05], [2.01, 0.04], [2.76, 0.02]]) osc(o, t + 0.02, 'sine', f * r, f * r * 0.99, 1.4, a, 0.002);
+  },
+  // target lock on (two rising ticks) / off (one low tick)
+  lock(t, on = true) {
+    const o = out(null, 0.05);
+    if (on) [1400, 1900].forEach((f, i) => osc(o, t + i * 0.05, 'square', f, f, 0.03, 0.07, 0.001));
+    else osc(o, t, 'square', 700, 500, 0.05, 0.07, 0.001);
+  },
   step(t, swim = false, sprint = false) {
     const o = out(null, 0.03);
     if (swim) {

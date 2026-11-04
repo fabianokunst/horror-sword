@@ -121,6 +121,8 @@ export class Campaign {
       dmg: D.dmg * (1 + 0.07 * g),
       elite: Math.min(0.4, Math.max(0, 0.02 + 0.025 * g + D.elite)),
       xp: D.xp * (1 + 0.1 * g),
+      // each new-game+ cycle lets one more creature strike at once (two more at most)
+      attackers: (D.attackers || 3) + Math.min(2, this.save.cycle),
     };
   }
 
