@@ -1,5 +1,6 @@
-// Video settings: presets, persistence and the side panel that edits the retro image filters live.
-const KEY = 'horror-sword:video';
+// Settings panel: video presets and the retro image filters, plus controls (camera sensitivity, inverted Y)
+// and sound volumes. Everything is edited live and persisted in localStorage.
+const KEY = 'horror-sword:video'; // (name kept so earlier saved video settings still load)
 
 const PRESETS = [
   { id: 'tv', name: 'TV de tubo', lines: 180, palette: 'rgb12', bright: 100, vignette: 50, texRes: 1, affine: 70, wobble: 1,
@@ -44,12 +45,25 @@ const SECTIONS = [
     { key: 'chroma', label: 'Aberração cromática', needs: 'crt' },
     { key: 'noise', label: 'Interferência', needs: 'crt' },
   ]],
+  // not part of the video presets (pref: true)
+  ['Controles', [
+    { key: 'sens', label: 'Sensibilidade da câmera', min: 25, max: 300, pref: true },
+    { key: 'invertY', label: 'Inverter eixo vertical', toggle: true, pref: true },
+    { key: 'vibrate', label: 'Vibração (celular)', toggle: true, pref: true },
+  ]],
+  ['Som', [
+    { key: 'vMusic', label: 'Música', pref: true },
+    { key: 'vSfx', label: 'Efeitos', pref: true },
+    { key: 'vAmb', label: 'Ambiente', pref: true },
+  ]],
 ];
 const CONTROLS = SECTIONS.flatMap(([, list]) => list);
+const VIDEO = CONTROLS.filter((c) => !c.pref);
+const PREFS = { sens: 100, invertY: false, vibrate: true, vMusic: 100, vSfx: 100, vAmb: 100 };
 
 function defaults() {
   const { id, name, ...v } = PRESETS[0];
-  return v;
+  return { ...v, ...PREFS };
 }
 
 function load() {
@@ -186,7 +200,7 @@ export class Settings {
       row.classList.toggle('off', !!disabled);
       if (info) info.textContent = this.describe?.() ?? '';
     }
-    const match = PRESETS.find((pr) => CONTROLS.every((c) => pr[c.key] === v[c.key]));
+    const match = PRESETS.find((pr) => VIDEO.every((c) => pr[c.key] === v[c.key]));
     this.custom.hidden = !!match;
     this.preset.value = match ? match.id : '';
   }

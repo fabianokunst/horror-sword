@@ -3,7 +3,9 @@
 // pause filter -> compressor, with a generated cathedral reverb on a send. Positional sounds are panned and
 // attenuated relative to the listener (player position + camera yaw).
 let ctx = null, master, duck, verb, noiseBuf, sfxBus, musBus, musIn, ambBus, amb = null;
+let sfxVol, musVol, ambVol, musVerb; // player-set volumes (settings panel), after each bus
 let muted = false, prevTime = 0;
+const VOLS = { music: 1, sfx: 1, amb: 1 };
 const VOL = 0.9;
 const last = {};
 const L = { x: 0, z: 0, yaw: 0 };
@@ -29,11 +31,15 @@ export function initAudio() {
   verb = ctx.createConvolver();
   verb.buffer = impulse(3.4, 2.5);
   verb.connect(gain(0.8, master));
-  sfxBus = gain(1, master);
-  musBus = gain(0.3, master);
+  sfxVol = gain(VOLS.sfx, master);
+  sfxBus = gain(1, sfxVol);
+  musVol = gain(VOLS.music, master);
+  musBus = gain(0.3, musVol);
   musIn = gain(1, musBus);
-  musIn.connect(gain(0.5, verb));
-  ambBus = gain(0.8, master);
+  musVerb = gain(0.5 * VOLS.music, verb);
+  musIn.connect(musVerb);
+  ambVol = gain(VOLS.amb, master);
+  ambBus = gain(0.8, ambVol);
   document.addEventListener('visibilitychange', () => (document.hidden ? ctx.suspend() : ctx.resume()));
 }
 
@@ -51,6 +57,17 @@ export function toggleMute() {
   return muted;
 }
 export const isMuted = () => muted;
+
+// Settings panel volumes, 0..1 each (applied now, or when the audio starts on the first click)
+export function setVolumes({ music = VOLS.music, sfx = VOLS.sfx, amb = VOLS.amb } = {}) {
+  Object.assign(VOLS, { music, sfx, amb });
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  sfxVol.gain.setTargetAtTime(sfx, t, 0.05);
+  musVol.gain.setTargetAtTime(music, t, 0.05);
+  musVerb.gain.setTargetAtTime(0.5 * music, t, 0.05);
+  ambVol.gain.setTargetAtTime(amb, t, 0.05);
+}
 
 // ------------------------------------------------------------------ building blocks
 function gain(v, to) {
@@ -94,7 +111,9 @@ function out(pos, wet = 0.2, bus = sfxBus) {
     wet = Math.min(0.9, wet + d / 70);
   }
   node.connect(gain(att, bus));
-  if (wet > 0) inp.connect(gain(wet * Math.sqrt(att), verb));
+  // the reverb send skips the bus, so it takes the bus's volume here
+  const vol = bus === ambBus ? VOLS.amb : bus === musBus || bus === musIn ? VOLS.music : VOLS.sfx;
+  if (wet > 0) inp.connect(gain(wet * Math.sqrt(att) * vol, verb));
   return inp;
 }
 

@@ -13,7 +13,8 @@ import { Hud } from './hud.js';
 import { Inventory } from './inventory.js';
 import { Campaign, roman } from './campaign.js';
 import { HuntMenu } from './menu.js';
-import { initAudio, sfx, updateAmbient, setListener, setPaused, toggleMute, isMuted } from './audio.js';
+import { initAudio, sfx, updateAmbient, setListener, setPaused, toggleMute, isMuted, setVolumes } from './audio.js';
+import { Gamepads } from './gamepad.js';
 import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
@@ -100,6 +101,10 @@ const enemies = new Enemies(scene, fx);
 enemies.world = world;
 const input = new Input(renderer.domElement);
 const touch = new TouchControls(input);
+const pads = new Gamepads(input);
+// camera sensitivity, inverted Y and vibration from the settings panel (applied in applyPrefs below)
+const prefs = { sens: 1, invertY: false, vibrate: true };
+const LOOK_K = 0.0024; // radians per mouse pixel at 100% sensitivity
 const hud = new Hud();
 const inv = new Inventory(scene, player, fx, renderer);
 const lock = new LockOn(scene);
@@ -116,9 +121,15 @@ let camYaw = player.facing + Math.PI, camPitch = 0.32;
 let dayT = 0.44, night = 0, wasNight = false, draculaNight = -1, hitstop = 0, deadTimer = 0, elapsed = 0;
 let dayAmt = 1, bloodMoon = false, witch = 0;
 
+// phone vibration / controller rumble, unless switched off in the settings
+function buzz(ms, strong) {
+  if (!prefs.vibrate) return;
+  if (input.touch) navigator.vibrate?.(ms);
+  pads.rumble(ms * 2, strong);
+}
 enemies.onPlayerHit = () => {
   sfx.hurt(); hud.hurt(); fx.shake += 0.5; player.flash = 0.1;
-  if (input.touch) navigator.vibrate?.(60);
+  buzz(60, 0.8);
 };
 // a roll at the last instant before a blow: slow motion for the creatures and a counter window for the blade
 enemies.onPerfectDodge = () => {
@@ -127,7 +138,7 @@ enemies.onPerfectDodge = () => {
   sfx.perfect();
   fx.burst(player.pos.clone().setY(player.pos.y + 1), player.rank.color, 24, { speed: 6, up: 2, gravity: 0, life: 0.5, size: 0.12 });
   hud.toast('✦ Esquiva perfeita — contra-ataque!');
-  if (input.touch) navigator.vibrate?.(30);
+  buzz(30, 0.3);
 };
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
@@ -290,8 +301,25 @@ soundLabel();
 const settings = new Settings({
   panel: document.getElementById('settings'), menu, button: document.getElementById('settingsBtn'), describe: () => retro.info,
 });
-settings.onChange = (v) => retro.apply(v);
+// controls and sound preferences live in the same panel
+function applyPrefs(v) {
+  prefs.sens = v.sens / 100;
+  prefs.invertY = v.invertY;
+  prefs.vibrate = v.vibrate;
+  setVolumes({ music: v.vMusic / 100, sfx: v.vSfx / 100, amb: v.vAmb / 100 });
+}
+settings.onChange = (v) => { retro.apply(v); applyPrefs(v); };
 retro.apply(settings.values);
+applyPrefs(settings.values);
+
+// controllers: a hint the first time one connects; A/Start press the main button of title, pause, death and victory
+pads.onConnect = () => hud.toast('Controle conectado · A pula · X espada · B esquiva · Y besta · LB alvo · LT corre');
+pads.onMenuPress = (b) => {
+  if (settings.isOpen) { if (b === 'B') settings.close(); return; }
+  if (b === 'B') return;
+  const btn = [winBtn, retryBtn, playBtn].find((el) => el.offsetParent !== null);
+  btn?.click();
+};
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -436,6 +464,8 @@ function frame() {
   const time = elapsed;
   let dt = rawDt;
   if (hitstop > 0) { hitstop -= rawDt; dt = rawDt * 0.05; }
+  // controllers first: their buttons become this frame's virtual keys
+  pads.update(rawDt, state === 'play' ? 'play' : state === 'inv' || state === 'levelup' ? 'ui' : 'menu');
 
   if (state === 'play' || state === 'dead') {
     // slow motion after a perfect dodge, easing back to full speed over its last quarter second
@@ -450,8 +480,8 @@ function frame() {
         // the camera swings to look past the hunter at the target (gently when it is right on top of us)
         const d = Math.hypot(lock.target.pos.x - player.pos.x, lock.target.pos.z - player.pos.z);
         camYaw = lerpAngle(camYaw, lock.yaw(player), 1 - Math.exp(-6 * Math.min(1, d / 3) * rawDt));
-      } else camYaw -= input.dx * 0.0024;
-      camPitch = Math.min(1.2, Math.max(-0.3, camPitch + input.dy * 0.0024));
+      } else camYaw -= input.dx * LOOK_K * prefs.sens;
+      camPitch = Math.min(1.2, Math.max(-0.3, camPitch + input.dy * LOOK_K * prefs.sens * (prefs.invertY ? -1 : 1)));
     }
     let f = (input.down('KeyW') ? 1 : 0) - (input.down('KeyS') ? 1 : 0);
     let r = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
@@ -472,7 +502,7 @@ function frame() {
 
     if (state === 'play') {
       // without pointer lock the browser never reports Esc as a lock change, so pause by key here
-      if (!input.locked && (input.hit('Escape') || input.hit('KeyP'))) pause();
+      if ((!input.locked && (input.hit('Escape') || input.hit('KeyP'))) || input.hit('GamepadPause')) pause();
       if (input.hit('KeyR')) lock.toggle(player, enemies, camAim);
       if (input.hit('Mouse0')) {
         const t = lock.target || enemies.target(player, camAim, 6, 1.3);

@@ -205,6 +205,49 @@ async function desktop(browser, url, errors) {
   await page.close();
 }
 
+// a fake standard-mapping controller (navigator.getGamepads is replaced before the game loads)
+async function gamepad(browser, url, errors) {
+  const page = await browser.newPage();
+  page.on('pageerror', (e) => errors.push('gamepad: ' + e.message));
+  await page.setViewport({ width: 640, height: 360 });
+  await page.evaluateOnNewDocument(() => {
+    try { localStorage.clear(); } catch {}
+    const pad = { id: 'smoke-test pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+    window.__pad = pad;
+    Object.defineProperty(navigator, 'getGamepads', { value: () => [pad], configurable: true });
+  });
+  await page.goto(url);
+  await page.waitForFunction(() => window.__hs && document.getElementById('play'), WAIT);
+  const sections = await page.evaluate(() => [...document.querySelectorAll('#settings h4')].map((h) => h.textContent));
+  check('settings panel has Controles and Som', sections.includes('Controles') && sections.includes('Som'), sections);
+  const press = async (i, n = 3) => {
+    await page.evaluate((i) => { __pad.buttons[i].pressed = true; __pad.buttons[i].value = 1; }, i);
+    await frames(page, n);
+    await page.evaluate((i) => { __pad.buttons[i].pressed = false; __pad.buttons[i].value = 0; }, i);
+    await frames(page, 2);
+  };
+  await press(0); // A on the title screen
+  const started = await page.waitForFunction(() => __hs.state() === 'play', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('controller: A starts the hunt', started);
+  if (!started) return page.close();
+  await page.waitForFunction(() => __hs.enemies.nav && __hs.enemies.nav.ready, WAIT);
+  await page.evaluate(() => { __hs.enemies.spawn = () => null; __hs.enemies.reset(); __hs.player.maxHp = __hs.player.hp = 1e6; });
+  const yaw0 = await page.evaluate(() => __hs.cam());
+  await page.evaluate(() => { __pad.axes[2] = 1; });
+  await frames(page, 8);
+  await page.evaluate(() => { __pad.axes[2] = 0; });
+  const yaw1 = await page.evaluate(() => __hs.cam());
+  check('controller: right stick turns the camera', Math.abs(yaw1 - yaw0) > 0.05, { turned: +(yaw1 - yaw0).toFixed(2) });
+  await crowd(page, 'ghoul', 3, 6);
+  await press(4); // LB
+  const locked = await page.waitForFunction(() => __hs.lock.target, { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('controller: LB locks a target', locked);
+  await press(9); // Start
+  const paused = await page.waitForFunction(() => __hs.state() === 'pause', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('controller: Start pauses', paused);
+  await page.close();
+}
+
 async function touch(browser, url, errors) {
   const page = await browser.newPage();
   page.__url = url;
@@ -250,6 +293,7 @@ try {
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio', ...(process.env.CI ? ['--no-sandbox'] : [])],
   });
   await desktop(browser, url, errors);
+  await gamepad(browser, url, errors);
   await touch(browser, url, errors);
 } catch (e) {
   check('smoke test ran to the end', false, e.stack || String(e));

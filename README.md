@@ -40,6 +40,23 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | M | liga/desliga o som (também há o botão SOM no menu) |
 | Esc | pausa |
 
+### Controle (Xbox, PlayStation e similares)
+
+| Botão | Ação |
+|---|---|
+| Analógico esquerdo / direito | mover / câmera |
+| A (✕) | pular · nos menus: confirmar / CAÇAR / CONTINUAR |
+| B (◯) | esquiva · nos menus: voltar |
+| X (▢) / RB | espada (segure para o combo) |
+| Y (△) / RT | besta |
+| LB / R3 | travar alvo |
+| LT / L3 | correr (segurando) |
+| Direcional ↑ | pegar item · no inventário e nas cartas de dom: mover o cursor |
+| Back / Select | inventário |
+| Start | pausa / continuar |
+
+O controle vibra ao levar golpe e na esquiva perfeita (onde o navegador permite). Em **Configurações → Controles** dá para mudar a sensibilidade da câmera (mouse, toque e controle), inverter o eixo vertical e desligar a vibração; em **Som**, os volumes de música, efeitos e ambiente.
+
 ### Celular e tablet
 
 Funciona de celulares pequenos (iPhone SE) a monitores ultrawide, em paisagem ou retrato (paisagem é recomendada). Em tela de toque os controles aparecem sozinhos:
@@ -96,7 +113,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 ## Estrutura
 
 - `src/ps1.js` — pipeline retrô: baixa resolução com pixels inteiros, vertex snapping, texturas afins/reduzidas, paletas com dithering (Bayer 2×2/4×4/8×8 ou ruído) e filtro de monitor CRT; materiais e texturas procedurais.
-- `src/settings.js` — painel de configurações (botão no menu/pausa): predefinições e ajuste ao vivo de resolução, cores, texturas, dithering e CRT, salvo no `localStorage`.
+- `src/settings.js` — painel de configurações (botão no menu/pausa): predefinições e ajuste ao vivo de resolução, cores, texturas, dithering e CRT, mais sensibilidade da câmera, eixo invertido, vibração e volumes de música/efeitos/ambiente, salvo no `localStorage`.
 - `src/world.js` — vale desenhado à mão e fechado por montanhas: relevo projetado (rio, lago, colinas, monte do castelo), terreno pintado, estradas, florestas, minimapa pré-renderizado, colisão em grade, ponte caminhável (`groundAt`), caixões/portão/arena e pool de luzes pontuais.
 - `src/structures.js` — construções únicas: Vilarejo de Borgo (casas enxaimel, igreja, poço, feira), Cemitério dos Esquecidos (mausoléu, anjo), Moinho Queimado (pás girando), Abadia de São Miguel (rosácea), Colina da Forca, Ponte do Rio Argeș, santuários e o Castelo Drácula.
 - `src/characters.js` — personagens com malha contínua e esqueleto (`SkinnedMesh`): tubos e elipsoides suaves fundidos numa malha só, pesos de skinning calculados por distância aos ossos; acessórios rígidos (espada, chapéu, coroa, besta) presos aos ossos.
@@ -110,6 +127,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/progress.js` — dificuldades, dons, títulos, curva de XP e leitura/gravação do save no `localStorage`.
 - `src/menu.js`, `src/campaign.css` — painel do menu (continuar / nova caçada / dificuldade) e estilos de XP, toast e cartas de dom.
 - `src/inventory.js`, `src/items.js` — inventário à moda antiga da Capcom: 8 espaços, usar/combinar/examinar/descartar, eletrocardiograma de condição, item girando em 3D; ervas (verde, vermelha e misturas) e água benta brilhando pelo vale ou caídas dos inimigos.
+- `src/gamepad.js` — controles de videogame (mapeamento padrão): botões viram as mesmas teclas virtuais do teclado, conforme o contexto (jogo, inventário/dons, menus).
 - `src/touch.js` — controles de toque (analógico, câmera, botões); viram teclas virtuais no `Input`, então o loop do jogo não distingue toque de teclado.
 - `src/audio.js` — todo o som é sintetizado em tempo real (veja abaixo).
 - `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, HUD/minimapa, entrada e loop/ciclo dia-noite.
