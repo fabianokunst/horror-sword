@@ -1,0 +1,65 @@
+/* shrine / merchant prompt (above the item pickup prompt) and the merchant's window */
+#actPrompt {
+  position: fixed;
+  left: 50%;
+  bottom: 33%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  background: rgba(8, 4, 8, 0.7);
+  border: 1px solid #8a6a3a;
+  font-size: clamp(18px, 3.4vmin, 28px);
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+}
+#actPrompt b {
+  font-weight: normal;
+  color: #f0d080;
+  border: 1px solid #5a4a30;
+  padding: 0 6px;
+  margin-right: 6px;
+  background: #1a1008;
+}
+body.touch #actPrompt { display: flex; align-items: center; min-height: 44px; }
+#actPrompt.hidden { display: none; }
+@media (orientation: portrait) {
+  body.touch #actPrompt { bottom: calc(var(--pad) + var(--sb) + var(--cluster) + 130px); }
+}
+
+#shop { z-index: 5; background: radial-gradient(ellipse at center, rgba(30, 20, 8, 0.6), rgba(0, 0, 0, 0.9)); }
+#shop h1 { color: #f0c060; text-shadow: 4px 4px 0 #2a1800, 0 0 30px rgba(255, 190, 80, 0.4); }
+#shop h2 { color: #90f0ff; }
+#wares { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.6vw, 18px); max-width: 100%; }
+#wares .ware {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: clamp(150px, 24vmin, 230px);
+  min-height: 44px;
+  padding: clamp(10px, 2vh, 18px) 12px;
+  font-family: 'VT323', monospace;
+  font-size: clamp(15px, min(2.2vw, 3.6vh), 20px);
+  letter-spacing: 0;
+  line-height: 1.15;
+  color: #e8dcc8;
+  background: rgba(26, 16, 8, 0.9);
+  border: 2px solid #5a4a30;
+  box-shadow: 4px 4px 0 #000;
+  transition: transform 0.08s;
+}
+#wares .ware.sel { border-color: #e8b53a; background: rgba(106, 8, 24, 0.92); transform: translateY(-4px); }
+#wares .ware.off { opacity: 0.55; }
+#wares .ware b { font-family: 'Pirata One', serif; font-weight: normal; font-size: 1.3em; color: #f0d080; }
+.wr-p { color: #90f0ff; font-size: 1.1em; }
+.shop-say { min-height: 1.4em; margin: clamp(8px, 2vh, 16px) 0; font-size: clamp(16px, 2.4vmin, 22px); color: #c8b8a0; }
+.shop-say.bad { color: #ff6070; }
+#shop > button.secondary { margin-top: 4px; }
+@media (hover: hover) {
+  #wares .ware:hover { background: rgba(106, 8, 24, 0.92); }
+}
+@media (orientation: portrait) {
+  #wares { flex-direction: column; align-items: center; }
+  #wares .ware { width: min(86vw, 360px); }
+}

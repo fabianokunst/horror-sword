@@ -308,8 +308,15 @@ export class World {
     const bridge = this.addSite(S.buildBridge(0, RZ0, h0, h1, bl));
     PLATFORMS.push(bridge.platform);
 
-    for (const [x, z, ry] of [[4, 80, 0], [10, 14, -0.5], [31, -52, -1.2], [-18, -120, 1], [-50, 101, 0.3], [62, -2, -0.2], [-62, -94, 0.4], [-22, -20, 0.8]])
-      this.addSite(S.buildShrine(x, heightAt(x, z), z, ry));
+    // wayside shrines: rest points (interact.js) — the hunter prays in front of them
+    this.shrines = [];
+    for (const [x, z, ry] of [[4, 80, 0], [10, 14, -0.5], [31, -52, -1.2], [-18, -120, 1], [-50, 101, 0.3], [62, -2, -0.2], [-62, -94, 0.4], [-22, -20, 0.8]]) {
+      const s = this.addSite(S.buildShrine(x, heightAt(x, z), z, ry));
+      this.shrines.push({ x, z, ry, light: s.lights[0] });
+    }
+    // Borgo's merchant stands by the red market stall, facing the square
+    const vil = this.sites[0], m = vil.world(-5.4, 5.6);
+    this.merchantSpot = { x: m.x, z: m.z, facing: Math.atan2(vil.x - m.x, vil.z - m.z) };
 
     const castle = this.addSite(S.buildCastle(CASTLE.x, CASTLE.h, CASTLE.z));
     this.castle = castle.root;

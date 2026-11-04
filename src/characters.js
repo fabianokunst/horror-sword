@@ -463,6 +463,31 @@ function buildWolf() {
   return R.build();
 }
 
+// Borgo's merchant: stout, aproned, wide-brimmed hat, a lantern to show his wares at night
+function buildMerchant() {
+  const C = { skin: 0xe0a880, shirt: 0xd8c8a0, vest: 0x6a3a1c, apron: 0xc8b890, pants: 0x3a3048, boot: 0x3a2414, hat: 0x2a2018, beard: 0x8a6a4a, gold: 0xf0bc40 };
+  const R = new Rig();
+  humanBones(R);
+  humanBody(R, { skin: C.skin, top: C.vest, pants: C.pants, boot: C.boot, sleeve: C.shirt, cuff: C.shirt, belt: C.boot, collar: C.shirt }, { w: 1.25 });
+  R.add(tube([
+    { p: [0, 1.25, 0.12], r: [0.2, 0.03], c: C.apron }, { p: [0, 0.95, 0.16], r: [0.23, 0.03], c: C.apron }, { p: [0, 0.55, 0.14], r: [0.21, 0.025], c: C.apron },
+  ], { segs: 8 }), ['chest', 'spine', 'hips']);
+  eyes(R, 0x3a2a1a, false);
+  R.add(ellipsoid([0, 1.73, 0.08], [0.09, 0.07, 0.06], C.beard), 'head');
+  for (const sx of [1, -1]) R.add(ellipsoid([0.05 * sx, 1.765, 0.11], [0.04, 0.012, 0.015], C.beard, { w: 6, h: 4 }), 'head');
+  R.prop('head', (g) => {
+    cyl(g, 0.24, 0.24, 0.02, 12, C.hat, 0, 1.9, 0);
+    cyl(g, 0.12, 0.13, 0.12, 10, C.hat, 0, 1.96, 0);
+  });
+  // a lantern hanging from the right hand
+  R.prop('handR', (g) => {
+    box(g, 0.02, 0.12, 0.02, 0x1a1a1a, -0.29, 0.78, 0.02);
+    box(g, 0.12, 0.16, 0.12, 0xffc060, -0.29, 0.64, 0.02, { glow: 2.2 });
+    box(g, 0.15, 0.03, 0.15, 0x1a1a1a, -0.29, 0.73, 0.02);
+  });
+  return R.build();
+}
+
 // the Count's witch: hooded and hunched, keeps her distance and hexes with a lantern staff
 function buildWitch() {
   const C = { skin: 0xa8b890, robe: 0x2a3a24, robeDk: 0x18241a, hood: 0x3a2a40, hair: 0xc8c8c0, wood: 0x5a3a1c, glow: 0x60ff90, bone: 0xe0d8b8 };
@@ -532,6 +557,7 @@ const BUILDERS = {
   wolf: buildWolf,
   bat: buildBat,
   witch: buildWitch,
+  merchant: buildMerchant,
 };
 
 const templates = new Map();

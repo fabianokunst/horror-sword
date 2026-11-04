@@ -36,7 +36,7 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Q / F / botão do meio | besta de prata (6 virotes, recarregam sozinhos) |
 | R | travar alvo (câmera, espada e besta miram a criatura; um movimento rápido do mouse para o lado troca de alvo) |
 | Tab / I | inventário (no celular: botão ITENS) |
-| E | pegar item brilhando no chão |
+| E | pegar item brilhando no chão · rezar no santuário · falar com o mercador |
 | M | liga/desliga o som (também há o botão SOM no menu) |
 | Esc | pausa |
 
@@ -110,6 +110,8 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 
 **Evolução:** almas dão experiência; cada nível dá +4 de vida, +2% de dano e a escolha de 1 entre 3 **dons** (vigor, couraça, fôlego, lâmina rúnica, alcance, golpe de misericórdia, sede de sangue, colheita de almas, aljava, prata benta, mãos ágeis, virote perfurante, passo fantasma, pés ligeiros; cada um com vários níveis). Concluir um capítulo dá meio nível de bônus. Os títulos mudam a cor da lâmina, da lanterna e dos golpes: Aprendiz (ciano) → Juramentado (nv 5, ouro) → Matador de Vampiros (10, carmesim) → Inquisidor (15, violeta) → Lenda da Noite (22, prata). No level-up o jogo pausa: toque/clique na carta, teclas 1-2-3 ou mova o mouse e clique.
 
+**Santuários e mercador:** os 8 santuários de beira de estrada (✝ dourado no minimapa) são pontos de descanso: **E** (toque no aviso, ou ↑ no controle) para rezar — vida, stamina e virotes cheios e o progresso é salvo ali, então ao cair você volta ao último santuário. Cada santuário atende uma vez por noite (a luz fica fraca depois). As almas (✦ no HUD) são também moeda: o **mercador** na praça de Borgo (¤ no minimapa) vende Erva Verde (8), Erva Vermelha (10), Água Benta (18) e Ervas Mistas V+R (30). O jogo pausa enquanto a loja está aberta (1-4 / ← → Enter / toque / controle).
+
 **Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo (posição, hora do dia, nível, dons, inventário). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
 
 ## Estrutura
@@ -122,6 +124,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/models.js` — primitivas (caixa, cilindro, frontão) e `bake()` para construções e acessórios.
 - `src/player.js` — movimento, combo, esquiva, besta; atributos vindos dos dons (`applyStats`) e cor do título (`setRank`).
 - `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
+- `src/interact.js`, `src/interact.css` — santuários (rezar: cura, recarga e checkpoint, uma vez por noite) e o mercador de Borgo (loja com almas, aviso na tela tocável).
 - `src/nav.js` — navegação das criaturas a pé: grade de 1 m numa janela de 112 m em volta do caçador, desenhada a partir dos círculos de colisão do mundo (refeita a cada 2 m andados ou 1 s), teste de linha de visão e campo de fluxo (Dijkstra em 8 direções) calculado só quando alguma criatura perde o caçador de vista.
 - `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
 - `src/camcollide.js` — colisão da câmera: um raio por quadro da cabeça do caçador até a câmera, contra as construções (malhas grandes como o castelo são divididas em pedaços de 6 m para o raio testar só os triângulos próximos) e o relevo. Paredes e telhados puxam a câmera na hora; ela volta suave quando o caminho abre; colada demais, o caçador some para não tapar a tela. Árvores ficam de fora de propósito (a câmera ficaria entrando e saindo nas florestas).

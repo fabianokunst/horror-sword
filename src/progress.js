@@ -95,7 +95,7 @@ export function addXp(save, amount) {
 
 export function newSave(difficulty = 'normal') {
   return {
-    v: VERSION, difficulty, chapter: 0, cycle: 0, level: 1, xp: 0, picks: 0, perks: {},
+    v: VERSION, difficulty, chapter: 0, cycle: 0, level: 1, xp: 0, picks: 0, perks: {}, purse: 0, // purse: souls to spend at the merchant
     stats: { kills: 0, souls: 0, deaths: 0, time: 0 }, pos: null, savedAt: 0,
   };
 }

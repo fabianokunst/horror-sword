@@ -230,6 +230,50 @@ async function desktop(browser, url, errors) {
   check("bride's scream stuns a hunter who doesn't dodge", moves.stunned, moves);
   await page.evaluate(() => __hs.enemies.reset());
 
+  // shrine: E restores health and saves the hunt there, once per night
+  const shrine = await page.evaluate(() => {
+    const { player, world } = __hs;
+    const s = world.shrines[0];
+    player.pos.set(s.x + 1.2, player.pos.y, s.z);
+    player.vel.set(0, 0, 0);
+    player.maxHp = 100;
+    player.hp = 20;
+    return { x: s.x, z: s.z };
+  });
+  await frames(page, 3);
+  await page.keyboard.press('KeyE');
+  await frames(page, 3);
+  const prayed = await page.evaluate((s) => {
+    const save = JSON.parse(localStorage.getItem('horror-sword:save') || 'null');
+    const healed = __hs.player.hp === __hs.player.maxHp;
+    __hs.player.hp = 20;
+    return { healed, savedHere: !!save?.pos && Math.hypot(save.pos.x - s.x, save.pos.z - s.z) < 3 };
+  }, shrine);
+  await page.keyboard.press('KeyE');
+  await frames(page, 3);
+  prayed.onceOnly = await page.evaluate(() => __hs.player.hp === 20);
+  check('shrine: prayer heals and saves the hunt there, once per night', prayed.healed && prayed.savedHere && prayed.onceOnly, prayed);
+  await page.evaluate(() => { __hs.player.maxHp = __hs.player.hp = 1e6; });
+
+  // merchant: E opens the shop (game paused), 1 buys a green herb for 8 souls, Esc closes
+  await page.evaluate(() => {
+    const { player, world, campaign, inv } = __hs;
+    const m = world.merchantSpot;
+    player.pos.set(m.x + 1.3, player.pos.y, m.z);
+    player.vel.set(0, 0, 0);
+    campaign.save.purse = 20;
+    inv.slots.fill(null);
+  });
+  await frames(page, 3);
+  await page.keyboard.press('KeyE');
+  const shopOpen = await page.waitForFunction(() => __hs.state() === 'shop', { ...WAIT, timeout: 20000 }).then(() => true, () => false);
+  await page.keyboard.press('Digit1');
+  await frames(page, 3);
+  const bought = await page.evaluate(() => ({ purse: __hs.campaign.save.purse, herb: __hs.inv.slots.includes('herbG') }));
+  await page.keyboard.press('Escape');
+  const shopClosed = await page.waitForFunction(() => __hs.state() !== 'shop', { ...WAIT, timeout: 20000 }).then(() => true, () => false);
+  check('merchant: shop opens, sells for souls, closes', shopOpen && bought.purse === 12 && bought.herb && shopClosed, { shopOpen, ...bought, shopClosed });
+
   // target lock on R, released on R
   await crowd(page, 'ghoul', 3, 6);
   await page.keyboard.press('KeyR');

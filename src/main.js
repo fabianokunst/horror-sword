@@ -18,6 +18,7 @@ import { Gamepads } from './gamepad.js';
 import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
+import { Interact } from './interact.js';
 
 const CYCLE = 240; // seconds for a full day/night
 // perfect dodge: creatures crawl at WITCH_SLOW speed for WITCH real seconds, the blade hits harder a bit longer
@@ -174,6 +175,14 @@ let finalFight = false;
 const campaign = new Campaign({ world, enemies, player, hud, fx });
 campaign.inv = inv;
 campaign.onVictory = () => setTimeout(showWin, 3500);
+// shrines (rest + checkpoint) and Borgo's merchant
+const interact = new Interact({ scene, world, player, campaign, inv, hud, fx });
+function useOrPickup() {
+  const r = interact.use(night);
+  if (r === 'shop') { state = 'shop'; touch.show(false); }
+  else if (!r) inv.pickup();
+}
+interact.onTap = () => { if (state === 'play') useOrPickup(); };
 world.onPlaceEnter = (p) => hud.message(p.name.toUpperCase(), p.sub, 3);
 function startFinalFight() {
   if (finalFight) return;
@@ -476,7 +485,7 @@ function frame() {
   let dt = rawDt;
   if (hitstop > 0) { hitstop -= rawDt; dt = rawDt * 0.05; }
   // controllers first: their buttons become this frame's virtual keys
-  pads.update(rawDt, state === 'play' ? 'play' : state === 'inv' || state === 'levelup' ? 'ui' : 'menu');
+  pads.update(rawDt, state === 'play' ? 'play' : state === 'inv' || state === 'levelup' || state === 'shop' ? 'ui' : 'menu');
 
   if (state === 'play' || state === 'dead') {
     // slow motion after a perfect dodge, easing back to full speed over its last quarter second
@@ -536,7 +545,7 @@ function frame() {
         sfx.bolt();
       } else if ((input.hit('KeyQ') || input.hit('KeyF') || input.hit('Mouse1')) && !player.bolts) sfx.empty();
       if (input.hit('KeyM')) { toggleMute(); soundLabel(); }
-      if (input.hit('KeyE')) inv.pickup();
+      if (input.hit('KeyE')) useOrPickup();
       if (input.hit('Tab') || input.hit('KeyI')) { state = 'inv'; inv.open(); touch.show(false); }
     }
 
@@ -570,13 +579,23 @@ function frame() {
     }
     const label = `${campaign.tag} · ${night === 0 ? 'CREPÚSCULO' : wasNight ? `NOITE ${night}` : `DIA ${night + 1}`}`;
     const goal = campaign.objective();
-    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter });
+    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0 });
     if (state === 'play' && campaign.save.picks > 0) openLevelUp();
     audioFrame(dt, time);
   } else {
     if (state === 'levelup') {
       const key = hud.perkInput(input);
       if (key) choosePerk(key);
+    }
+    if (state === 'shop') {
+      // like the inventory: closing (or losing the pointer lock) returns to the hunt / the pause menu
+      const lost = !input.touch && !input.locked && !input.freeLook;
+      if (lost || !interact.handle(input)) {
+        interact.close();
+        state = 'play';
+        touch.show(input.touch);
+        if (lost) pause();
+      }
     }
     if (state === 'inv') {
       // Esc (or switching to mouse) drops the pointer lock: close the inventory and fall into the pause menu.
@@ -598,6 +617,7 @@ function frame() {
 
   fx.update(dt, time, player.pos, 1 - dayAmt);
   inv.update(dt, time, state, world);
+  interact.update(rawDt, { play: state === 'play', night, touch: input.touch });
   updateWater(time);
 
   // third-person camera
@@ -628,7 +648,7 @@ frame();
 
 if (import.meta.env.DEV) {
   window.__hs = {
-    player, enemies, world, sfx, campaign, lock, camera, camCol, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
     state: () => state, witch: () => witch, cam: () => camYaw, camDist: () => camDist,
     setCam: (yaw, pitch) => { camYaw = yaw; if (pitch != null) camPitch = pitch; },
   };

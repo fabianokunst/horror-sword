@@ -136,7 +136,7 @@ export class Hud {
     const hrs = (time * 24 + 6) % 24;
     this.el.clock.textContent = `${String(Math.floor(hrs)).padStart(2, '0')}:${String(Math.floor((hrs % 1) * 60)).padStart(2, '0')}  ➶${player.bolts}`;
     this.el.kills.textContent = enemies.kills;
-    this.el.souls.textContent = enemies.souls;
+    this.el.souls.textContent = s.purse ?? enemies.souls; // souls to spend (lifetime total in the reports)
     const boss = enemies.boss;
     this.el.boss.classList.toggle('hidden', !boss);
     // the Count's bar shows where his phases begin (enemies.js BOSS_PHASES)
@@ -186,6 +186,10 @@ export class Hud {
     for (const { l } of world.visibleLights) plot(l.x, l.z, '#ffd070', 1.5);
     for (const o of enemies.orbs) plot(o.mesh.position.x, o.mesh.position.z, '#80f0ff', 1.5);
     for (const e of enemies.list) if (!e.dying) plot(e.pos.x, e.pos.z, DOT[e.type], e.T.boss ? 4 : 2.5);
+    // shrines and the merchant only when on the map (not pinned to the rim like objectives)
+    const local = (x, z, ch, color) => { if (Math.hypot(x - px, z - pz) * k < S / 2 - 8) icon(x, z, ch, color, 13); };
+    for (const s of world.shrines || []) local(s.x, s.z, '†', '#ffd080');
+    if (world.merchantSpot) local(world.merchantSpot.x, world.merchantSpot.z, '¤', '#90f0ff');
     for (const cf of world.coffins) if (!cf.destroyed) icon(cf.x, cf.z, '✝', '#ff3050');
     icon(CASTLE.x, CASTLE.z, '♜', world.gate.open ? '#ffd040' : '#ff2040');
     if (target) {

@@ -65,7 +65,11 @@ export class Campaign {
     this.inv = null; // optional inventory with save()/load()
     this.onVictory = null;
     this.setupChapter();
-    enemies.onSoul = (xp) => this.gainXp(xp);
+    // every soul is experience and one coin for Borgo's merchant
+    enemies.onSoul = (xp) => {
+      this.save.purse = (this.save.purse || 0) + 1;
+      this.gainXp(xp);
+    };
     world.onCoffinDestroyed = (c) => this.coffinDestroyed(c);
     world.onCoffinSealed = () => {
       sfx.deny();
@@ -334,7 +338,7 @@ export class Campaign {
   persistProgress() {
     if (!this.diff.keepXp) return;
     const s = this.save;
-    Object.assign(this.snapshot, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks } });
+    Object.assign(this.snapshot, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse });
     writeSave(this.snapshot);
   }
 
@@ -357,7 +361,7 @@ export class Campaign {
     // back to the last checkpoint, keeping lifetime stats (and, on easy, the hunter's growth)
     const next = cloneSave(this.snapshot);
     next.stats = { ...s.stats };
-    if (D.keepXp) Object.assign(next, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks } });
+    if (D.keepXp) Object.assign(next, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse });
     writeSave(next);
     this.next = next;
   }
