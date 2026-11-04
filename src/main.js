@@ -87,11 +87,23 @@ sunDisc.material = sunDisc.material.clone();
 sunDisc.material.fog = false;
 scene.add(moon, moonGlow, sunDisc);
 
-// water
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(260, 260, 52, 52).rotateX(-Math.PI / 2),
-  lambert(0x1a4a66, { transparent: true, opacity: 0.8 })
-);
+// water: the waves are computed in the vertex shader (chained after the PS1 patch), so the CPU only
+// moves the sheet along with the hunter and advances the clock
+const waterTime = { value: 0 };
+const waterMat = lambert(0x1a4a66, { transparent: true, opacity: 0.8 });
+const ps1Patch = waterMat.onBeforeCompile;
+waterMat.onBeforeCompile = (shader, r) => {
+  ps1Patch(shader, r);
+  shader.uniforms.uWaterTime = waterTime;
+  shader.vertexShader = 'uniform float uWaterTime;\n' + shader.vertexShader.replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>
+    vec3 hsWave = (modelMatrix * vec4(transformed, 1.0)).xyz;
+    transformed.y += sin(hsWave.x * 0.3 + uWaterTime * 1.5) * 0.1 + cos(hsWave.z * 0.25 + uWaterTime * 1.1) * 0.1;`
+  );
+};
+waterMat.customProgramCacheKey = () => 'ps1-water';
+const water = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 52, 52).rotateX(-Math.PI / 2), waterMat);
 scene.add(water);
 
 // ------------------------------------------------------------------ game objects
@@ -425,14 +437,9 @@ function updateSky(dt) {
 }
 
 function updateWater(time) {
-  const sx = Math.round(player.pos.x / 5) * 5, sz = Math.round(player.pos.z / 5) * 5;
-  water.position.set(sx, WATER, sz);
-  const p = water.geometry.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i) + sx, z = p.getZ(i) + sz;
-    p.setY(i, Math.sin(x * 0.3 + time * 1.5) * 0.1 + Math.cos(z * 0.25 + time * 1.1) * 0.1);
-  }
-  p.needsUpdate = true;
+  // snapped to a 5 m grid so the waves (in world space) don't slide with the hunter
+  water.position.set(Math.round(player.pos.x / 5) * 5, WATER, Math.round(player.pos.z / 5) * 5);
+  waterTime.value = time;
 }
 
 // ------------------------------------------------------------------ audio derived from game state
@@ -457,7 +464,8 @@ function audioFrame(dt, time) {
 
   let danger = 0;
   const near = [];
-  for (const e of enemies.alive) {
+  for (const e of enemies.list) {
+    if (e.dying) continue;
     const d = Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z);
     if (d < 30) { near.push(e); danger += 1 - d / 30; }
   }

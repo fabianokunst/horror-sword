@@ -115,8 +115,14 @@ export class Enemies {
     return e;
   }
 
+  // a creature leaves the scene: its cloned skeleton owns a bone texture on the GPU, free it
+  discard(e) {
+    this.scene.remove(e.m.root);
+    for (const mesh of e.m.meshes) mesh.skeleton?.dispose();
+  }
+
   reset() {
-    for (const e of this.list) this.scene.remove(e.m.root);
+    for (const e of this.list) this.discard(e);
     for (const o of this.orbs) this.scene.remove(o.mesh);
     for (const b of this.bolts) this.scene.remove(b.mesh);
     for (const s of this.shots) this.scene.remove(s.mesh);
@@ -125,7 +131,7 @@ export class Enemies {
     this.spawnTimer = 3;
   }
 
-  get alive() { return this.list.filter((e) => !e.dying); }
+  get alive() { return this.list.filter((e) => !e.dying); } // allocates: avoid in per-frame code
 
   // random valid spot around (px, pz) inside the valley; null when nothing fits
   spawn(type, px, pz, minD = 38, maxD = 55) {
@@ -360,7 +366,8 @@ export class Enemies {
 
     // spawning: the campaign chapter decides who roams, how many and how often
     this.spawnTimer -= dt;
-    const alive = this.list.filter((e) => !e.dying).length;
+    let alive = 0;
+    for (const e of this.list) if (!e.dying) alive++;
     const max = Math.min(26, Math.floor(1 + nightAmt * S.max));
     if (this.spawnTimer <= 0 && !player.dead) {
       this.spawnTimer = nightAmt > 0.5 ? S.interval : 7;
@@ -369,7 +376,7 @@ export class Enemies {
         const type = pool[Math.floor(Math.random() * pool.length)];
         const n = type === 'bat' ? 3 : 1;
         for (let i = 0; i < n; i++) this.spawn(type, player.pos.x, player.pos.z);
-        if (type === 'wolf' && Math.random() < 0.5) sfx.howl(this.list[this.list.length - 1].pos);
+        if (type === 'wolf' && Math.random() < 0.5 && this.list.length) sfx.howl(this.list[this.list.length - 1].pos); // (spawn can fail: no valid spot)
       }
     }
 
@@ -394,7 +401,7 @@ export class Enemies {
     for (let i = L.length - 1; i >= 0; i--) {
       const e = L[i];
       if (this.updateOne(e, dt, player, dayAmt, time, world)) {
-        this.scene.remove(e.m.root);
+        this.discard(e);
         L.splice(i, 1);
         if (e === this.boss) this.boss = null;
       }

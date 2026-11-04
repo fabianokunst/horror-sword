@@ -60,4 +60,9 @@ self.addEventListener('fetch', (e) => {
 export default defineConfig({
   base: './',
   plugins: [offline()],
+  build: {
+    // three.js in its own file: it rarely changes, so browsers (and the offline cache) keep it across deploys
+    chunkSizeWarningLimit: 700,
+    rollupOptions: { output: { manualChunks: (id) => (id.includes('node_modules/three/') ? 'three' : undefined) } },
+  },
 });

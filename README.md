@@ -137,7 +137,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/gamepad.js` — controles de videogame (mapeamento padrão): botões viram as mesmas teclas virtuais do teclado, conforme o contexto (jogo, inventário/dons, menus).
 - `src/touch.js` — controles de toque (analógico, câmera, botões); viram teclas virtuais no `Input`, então o loop do jogo não distingue toque de teclado.
 - `src/audio.js` — todo o som é sintetizado em tempo real (veja abaixo).
-- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, HUD/minimapa, entrada e loop/ciclo dia-noite.
+- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, HUD/minimapa, entrada e loop/ciclo dia-noite (a ondulação da água roda no shader de vértice). O build separa o three.js (`assets/three-*.js`) do código do jogo, então uma atualização só baixa de novo a parte que mudou.
 
 ## Som
 
