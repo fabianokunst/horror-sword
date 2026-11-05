@@ -5,6 +5,7 @@ import { createNoise2D } from 'simplex-noise';
 import { lambert, basic, canvasTexture, noiseTexture, glowSprite } from './ps1.js';
 import { mulberry32 } from './rng.js';
 import * as S from './structures.js';
+import { LimbBatch, deadTree } from './deadtree.js';
 import { L } from './i18n.js';
 
 export { mulberry32 };
@@ -161,13 +162,10 @@ function kinds() {
     }
   }, 3);
   const base = (geo) => geo.translate(0, 0.5, 0);
-  const trunk = base(new THREE.CylinderGeometry(0.12, 0.22, 1, 5));
-  const deadMat = lambert(0x7a7266, { map: bark });
   const cap = new THREE.SphereGeometry(1, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2);
   KINDS = {
-    trunk: { geo: trunk, mat: lambert(0x5b3f2c, { map: bark }) },
-    dead: { geo: trunk, mat: deadMat },
-    branch: { geo: base(new THREE.CylinderGeometry(0.03, 0.09, 1, 4)), mat: deadMat },
+    trunk: { geo: base(new THREE.CylinderGeometry(0.12, 0.22, 1, 5)), mat: lambert(0x5b3f2c, { map: bark }) },
+    dead: { mat: lambert(0x7a7266, { map: bark }) }, // merged per sector (deadtree.js), not instanced
     pine: { geo: base(new THREE.ConeGeometry(1, 1, 6)), mat: lambert(0x1f4a3a) },
     pineB: { geo: base(new THREE.ConeGeometry(1, 1, 6)), mat: lambert(0x2a5a34) },
     rock: { geo: new THREE.DodecahedronGeometry(1, 0), mat: lambert(0x6c6c80, { map: noiseTexture(16, 150, 255, 5) }) },
@@ -181,9 +179,17 @@ function kinds() {
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3();
 // instances bucketed into map sectors so frustum culling still works on a finite map
 class SectorBatch {
-  constructor(size = 96) { this.size = size; this.items = new Map(); }
+  constructor(size = 96) { this.size = size; this.items = new Map(); this.dead = new Map(); }
+  sector(x, z) { return Math.floor(x / this.size) + ',' + Math.floor(z / this.size); }
+  // the dead trees of one sector, grown straight into one geometry
+  deadTrees(x, z) {
+    const key = this.sector(x, z);
+    let b = this.dead.get(key);
+    if (!b) this.dead.set(key, (b = new LimbBatch()));
+    return b;
+  }
   add(kind, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
-    const key = kind + ':' + Math.floor(x / this.size) + ',' + Math.floor(z / this.size);
+    const key = kind + ':' + this.sector(x, z);
     let a = this.items.get(key);
     if (!a) this.items.set(key, (a = []));
     _p.set(x, y, z);
@@ -201,6 +207,11 @@ class SectorBatch {
       mesh.computeBoundingSphere();
       parent.add(mesh);
     }
+    for (const b of this.dead.values()) {
+      const mesh = new THREE.Mesh(b.geometry(), K.dead.mat);
+      mesh.castShadow = mesh.receiveShadow = true;
+      parent.add(mesh);
+    }
   }
 }
 
@@ -214,11 +225,11 @@ function addTree(B, obstacles, rnd, x, z, kind) {
     B.add(k, x, h + 3.9 * s, z, ry + 2, 0.85 * s, 1.8 * s, 0.85 * s);
     obstacles.push({ x, z, r: 0.35 * s });
   } else {
-    const s = 0.8 + rnd() * 0.7, th = 3.5 * s + rnd() * 2;
-    B.add('dead', x, h - 0.2, z, rnd() * 6, s * 1.2, th, s * 1.2, (rnd() - 0.5) * 0.15, (rnd() - 0.5) * 0.15);
-    const nb = 2 + Math.floor(rnd() * 3);
-    for (let i = 0; i < nb; i++)
-      B.add('branch', x, h + th * (0.45 + rnd() * 0.45), z, rnd() * Math.PI * 2, s, 1.2 + rnd() * 1.6, s, 0, 0.6 + rnd() * 0.6);
+    const s = 0.8 + rnd() * 0.7, th = 3.5 * s + rnd() * 2, seed = Math.floor(rnd() * 4294967296);
+    // the shape grows from its own seed; these draws keep the valley's layout (rnd) where it always was
+    rnd(); rnd();
+    for (let i = 4 * (2 + Math.floor(rnd() * 3)); i > 0; i--) rnd();
+    deadTree(B.deadTrees(x, z), seed, x, h, z, s * 1.2, th, heightAt);
     obstacles.push({ x, z, r: 0.3 * s });
   }
 }
