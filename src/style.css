@@ -86,8 +86,57 @@ body.touch #tl { max-width: calc(100vw - var(--map) - 44px - var(--pad) * 4 - va
   border-radius: 50%;
   border: 3px solid #8a6a3a;
   box-shadow: 0 0 0 2px #1a0a10;
-  image-rendering: pixelated;
 }
+/* under the minimap: the key that opens the valley map, then the landmark around the hunter */
+#mapKey, #mapPlace {
+  position: absolute;
+  right: calc(var(--pad) + var(--sr) + var(--map) / 2);
+  transform: translateX(50%);
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 #000;
+}
+#mapKey {
+  top: calc(var(--pad) + var(--st) + var(--map) - 0.7em);
+  padding: 0 6px;
+  border: 1px solid #8a6a3a;
+  background: rgba(20, 8, 12, 0.85);
+  font-size: clamp(12px, 1.6vmin, 20px);
+  line-height: 1.3;
+  color: #c8b890;
+}
+#mapKey b { color: #f0d080; font-weight: normal; }
+#mapPlace {
+  top: calc(var(--pad) + var(--st) + var(--map) + 0.9em);
+  max-width: calc(var(--map) * 1.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Pirata One', serif;
+  font-size: clamp(13px, 1.8vmin, 22px);
+  color: #e8d4a8;
+}
+/* touch screens keep the ITENS button there */
+#mapPlace:empty, body.touch #mapPlace { display: none; }
+
+/* the objective in the 3D view (hud.js waypoint): a diamond with the distance, an arrow when held at the edge */
+#waypoint {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  color: #ffd860;
+  text-shadow: 0 0 6px rgba(255, 180, 40, 0.6), 2px 2px 0 #000;
+  font-size: clamp(15px, 2.4vmin, 26px);
+  opacity: 0.9;
+}
+#waypoint[hidden] { display: none; }
+#waypoint i, #waypoint span, #waypoint .wp-arrow { position: absolute; left: 0; top: 0; translate: -50% -50%; font-style: normal; white-space: nowrap; }
+#waypoint i { font-size: 1.3em; animation: wp-pulse 0.9s ease-in-out infinite alternate; }
+#waypoint span { top: 1.25em; color: #ffe8b0; }
+#waypoint.flip span { top: -1.25em; }
+#waypoint .wp-arrow { display: none; font-weight: normal; font-size: 0.9em; transform-origin: 50% 50%; }
+#waypoint.edge .wp-arrow { display: block; }
+@keyframes wp-pulse { from { opacity: 0.65; } to { opacity: 1; } }
 
 #boss {
   position: absolute;
@@ -218,6 +267,17 @@ body.touch #boss { width: min(38vw, 420px); bottom: calc(var(--pad) + var(--sb))
   width: 44px;
   height: 44px;
 }
+/* a tap on the minimap opens the valley map: an invisible button right over it */
+#tbMap {
+  top: calc(var(--pad) + var(--st));
+  right: calc(var(--pad) + var(--sr));
+  width: var(--map);
+  height: var(--map);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#tbMap.down { background: rgba(232, 181, 58, 0.18); }
 
 @media (orientation: portrait) {
   body.touch #boss { width: 72vw; bottom: calc(var(--pad) + var(--sb) + var(--cluster) + 16px); }

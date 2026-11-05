@@ -1,0 +1,57 @@
+/* valley map (worldmap.js): the parchment sheet with the chapter, objective and legend beside it
+   (landscape) or around it (portrait) */
+#worldmap {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(12px, 3vmin, 36px);
+  background: radial-gradient(ellipse at center, rgba(20, 8, 4, 0.82), rgba(0, 0, 0, 0.94));
+  --wm-side: clamp(190px, 30vmin, 340px);
+}
+#wmCanvas {
+  display: block;
+  flex-shrink: 0;
+  aspect-ratio: 464 / 478;
+  width: auto;
+  /* as big as the screen allows, leaving the column at the side */
+  height: min(calc(100vh - max(32px, var(--st) + var(--sb) + 16px)), calc((100vw - var(--wm-side) - 64px) * 478 / 464));
+  height: min(calc(100dvh - max(32px, var(--st) + var(--sb) + 16px)), calc((100vw - var(--wm-side) - 64px) * 478 / 464));
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px #1a0a04, 0 0 0 4px #8a6a3a, 0 10px 40px rgba(0, 0, 0, 0.8);
+}
+.wm-side { width: var(--wm-side); text-align: left; }
+.wm-side h2 {
+  font-family: 'Pirata One', serif;
+  font-weight: normal;
+  font-size: clamp(20px, 4vmin, 40px);
+  line-height: 1.05;
+  color: #f0d080;
+  text-shadow: 2px 2px 0 #000;
+}
+#wmGoal { margin-top: 0.3em; font-size: clamp(15px, 2.6vmin, 26px); line-height: 1.1; color: #ff8a80; text-shadow: 2px 2px 0 #000; }
+#wmGoal:empty { display: none; }
+.wm-legend {
+  list-style: none;
+  margin: clamp(8px, 2.4vmin, 24px) 0;
+  font-size: clamp(14px, 2.3vmin, 24px);
+  line-height: 1.1;
+  color: #e8dcc8;
+  text-shadow: 2px 2px 0 #000;
+}
+.wm-legend li { display: flex; align-items: baseline; gap: 0.5em; margin: 0.25em 0; }
+.wm-legend i { font-style: normal; width: 1.2em; flex-shrink: 0; text-align: center; font-size: 1.15em; }
+.wm-you { color: #60c8ff; }
+.wm-goal, .wm-route { color: #ff4050; }
+.wm-shrine { color: #ffc060; }
+.wm-merchant { color: #70e0e8; }
+.wm-coffin { color: #ff6070; }
+.wm-hint { font-size: clamp(13px, 2vmin, 20px); color: #a89878; }
+
+@media (orientation: portrait) {
+  #worldmap { flex-direction: column; gap: 10px; }
+  /* title above the sheet, legend and hint below it */
+  .wm-side { display: contents; }
+  .wm-side h2, #wmGoal { order: -1; text-align: center; margin: 0; }
+  #wmCanvas { height: auto; width: min(calc(100vw - 32px), calc((100vh - 300px) * 464 / 478)); }
+  .wm-legend { margin: 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; text-align: left; font-size: clamp(13px, 3.4vw, 20px); }
+}

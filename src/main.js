@@ -21,6 +21,7 @@ import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
 import { Interact } from './interact.js';
 import { Blade } from './runes.js';
+import { WorldMap } from './worldmap.js';
 import { L, EN, translatePage, setLang } from './i18n.js';
 
 const CYCLE = 240; // seconds for a full day/night
@@ -120,15 +121,17 @@ const touch = new TouchControls(input);
 const pads = new Gamepads(input);
 // the mouse pointer drawn on the choice screens, where the real one stays locked (and hidden)
 const ptr = new UiCursor();
-const choosing = () => state === 'inv' || state === 'levelup' || state === 'shop';
+// (the valley map too: the controller and the mouse leave the camera alone while it is open)
+const choosing = () => state === 'inv' || state === 'levelup' || state === 'shop' || state === 'map';
 // camera sensitivity, inverted Y and vibration from the settings panel (applied in applyPrefs below)
-const prefs = { sens: 1, invertY: false, vibrate: true };
+const prefs = { sens: 1, invertY: false, vibrate: true, waypoint: true };
 const LOOK_K = 0.0024; // radians per mouse pixel at 100% sensitivity
 const hud = new Hud();
 const inv = new Inventory(scene, player, fx, renderer);
 const lock = new LockOn(scene);
 lock.btn = document.querySelector('#touch [data-key="KeyR"]');
 const camCol = new CameraCollider(world);
+const worldMap = new WorldMap();
 
 const spawnPt = findSpawn();
 player.pos.set(spawnPt.x, heightAt(spawnPt.x, spawnPt.z), spawnPt.z);
@@ -139,6 +142,7 @@ let state = 'menu';
 let camYaw = player.facing + Math.PI, camPitch = 0.32;
 let dayT = 0.44, night = 0, wasNight = false, draculaNight = -1, hitstop = 0, deadTimer = 0, elapsed = 0;
 let dayAmt = 1, bloodMoon = false, witch = 0;
+let goal = { text: '' }; // this frame's objective (campaign.objective)
 
 // phone vibration / controller rumble, unless switched off in the settings
 function buzz(ms, strong) {
@@ -334,6 +338,18 @@ function choosePerk(key) {
   }
 }
 
+// the valley map (worldmap.js): M, D-pad down or a tap on the minimap; the hunt waits while it is open
+function openMap() {
+  state = 'map';
+  touch.show(false);
+  worldMap.open({
+    title: `${campaign.tag} — ${campaign.chapter.title}`,
+    goal: goal.text,
+    hint: input.touch ? L('Toque para voltar', 'Tap to go back') : pads.active ? L('B ou ↓ para voltar', 'B or ↓ to go back') : L('M ou clique direito para voltar', 'M or right click to go back'),
+  });
+  sfx.paper();
+}
+
 function pause() {
   if (state !== 'play') return;
   state = 'pause';
@@ -352,7 +368,7 @@ input.onModeChange = (isTouch) => {
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
-// sound on/off: menu button (works on touch too) and the M key; remembered between visits
+// sound on/off: menu button (works on touch too) and the N key; remembered between visits
 const soundBtn = document.getElementById('soundBtn');
 const soundLabel = () => { if (soundBtn) soundBtn.textContent = isMuted() ? L('♪ SOM: DESLIGADO', '♪ SOUND: OFF') : L('♪ SOM: LIGADO', '♪ SOUND: ON'); };
 soundBtn?.addEventListener('click', () => { toggleMute(); soundLabel(); });
@@ -376,6 +392,8 @@ function applyPrefs(v) {
   prefs.sens = v.sens / 100;
   prefs.invertY = v.invertY;
   prefs.vibrate = v.vibrate;
+  prefs.waypoint = v.waypoint;
+  hud.mapRotate = v.mapRotate;
   setVolumes({ music: v.vMusic / 100, sfx: v.vSfx / 100, amb: v.vAmb / 100 });
 }
 settings.onChange = (v) => { retro.apply(v); applyPrefs(v); };
@@ -600,7 +618,8 @@ function frame() {
       if (input.hit('KeyX') || input.hit('WheelDown')) blade.next(1);
       if (input.hit('WheelUp') || input.hit('RunePrev')) blade.next(-1);
       for (let i = 0; i < 6; i++) if (input.hit(`Digit${i + 1}`)) blade.slot(i);
-      if (input.hit('KeyM')) { toggleMute(); soundLabel(); }
+      if (input.hit('KeyN')) { toggleMute(); soundLabel(); }
+      if (input.hit('KeyM')) openMap();
       if (input.hit('KeyE')) useOrPickup();
       if (input.hit('Tab') || input.hit('KeyI')) { state = 'inv'; inv.open(); touch.show(false); }
     }
@@ -637,8 +656,9 @@ function frame() {
       deadUi.classList.remove('hidden');
     }
     const label = `${campaign.tag} · ${night === 0 ? L('CREPÚSCULO', 'DUSK') : wasNight ? `${L('NOITE', 'NIGHT')} ${night}` : `${L('DIA', 'DAY')} ${night + 1}`}`;
-    const goal = campaign.objective();
-    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0 });
+    goal = campaign.objective();
+    const mapKey = input.touch ? L('MAPA', 'MAP') : `<b>${pads.active ? '↓' : 'M'}</b> ${L('MAPA', 'MAP')}`;
+    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0, mapKey });
     if (state === 'play' && campaign.save.picks > 0) openLevelUp();
     audioFrame(dt, time);
   } else {
@@ -654,6 +674,19 @@ function frame() {
         state = 'play';
         touch.show(input.touch);
         if (lost) pause();
+      }
+    }
+    if (state === 'map') {
+      // like the inventory: closing returns to the hunt; losing the pointer lock (Esc) falls into the pause menu
+      const lost = !input.touch && !input.locked && !input.freeLook;
+      if (lost || !worldMap.handle(input)) {
+        worldMap.close();
+        sfx.paper(false);
+        state = 'play';
+        touch.show(input.touch);
+        if (lost) pause();
+      } else {
+        worldMap.draw({ player, target: goal.target, path: hud.path, coffins: world.coffins, shrines: interact.shrines, night, merchant: world.merchantSpot, time: elapsed });
       }
     }
     if (state === 'inv') {
@@ -699,11 +732,12 @@ function frame() {
   // locked on: aim a little toward the target so flying creatures stay in frame
   if (lock.target && state === 'play') camTarget.lerp(lock.center(camLook), 0.2);
   camera.lookAt(camTarget);
+  hud.waypoint(camera, goal.target, player, state === 'play' && prefs.waypoint);
 
   retro.render(scene, camera);
   // after this frame's state changes: until the next one the mouse points at the choice screen or plays
   input.ui = choosing();
-  ptr.show(input.ui && input.locked && !input.touch);
+  ptr.show(input.ui && state !== 'map' && input.locked && !input.touch);
   input.endFrame();
 }
 frame();
@@ -715,7 +749,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 if (import.meta.env.DEV) {
   window.__hs = {
-    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, input, ptr, blade, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, input, ptr, blade, hud, worldMap, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
     state: () => state, witch: () => witch, cam: () => camYaw, camDist: () => camDist,
     setCam: (yaw, pitch) => { camYaw = yaw; if (pitch != null) camPitch = pitch; },
   };

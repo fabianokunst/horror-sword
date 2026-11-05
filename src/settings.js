@@ -1,5 +1,6 @@
-// Settings panel: video presets and the retro image filters, plus controls (camera sensitivity, inverted Y)
-// and sound volumes. Everything is edited live and persisted in localStorage.
+// Settings panel: video presets and the retro image filters, plus controls (camera sensitivity, inverted Y),
+// sound volumes and the map aids (minimap turning with the camera, objective marker). Everything is edited live
+// and persisted in localStorage.
 import { L } from './i18n.js';
 
 const KEY = 'horror-sword:video'; // (name kept so earlier saved video settings still load)
@@ -70,6 +71,10 @@ const SECTIONS = [
     { key: 'invertY', label: L('Inverter eixo vertical', 'Invert vertical axis'), toggle: true, pref: true },
     { key: 'vibrate', label: L('Vibração (celular e controle)', 'Vibration (phone and controller)'), toggle: true, pref: true },
   ]],
+  [L('Mapa', 'Map'), [
+    { key: 'mapRotate', label: L('Minimapa gira com a câmera', 'Minimap turns with the camera'), toggle: true, pref: true },
+    { key: 'waypoint', label: L('Marcador do objetivo na tela', 'Objective marker on screen'), toggle: true, pref: true },
+  ]],
   [L('Som', 'Sound'), [
     { key: 'vMusic', label: L('Música', 'Music'), pref: true },
     { key: 'vSfx', label: L('Efeitos', 'Effects'), pref: true },
@@ -78,7 +83,7 @@ const SECTIONS = [
 ];
 const CONTROLS = SECTIONS.flatMap(([, list]) => list);
 const VIDEO = CONTROLS.filter((c) => !c.pref);
-const PREFS = { sens: 100, invertY: false, vibrate: true, vMusic: 100, vSfx: 100, vAmb: 100 };
+const PREFS = { sens: 100, invertY: false, vibrate: true, mapRotate: true, waypoint: true, vMusic: 100, vSfx: 100, vAmb: 100 };
 
 function defaults() {
   const { id, name, ...v } = PRESETS[0];

@@ -1,7 +1,8 @@
 // Smoke test: builds a development snapshot of the game (keeps the window.__hs dev hook), serves it on a free
 // port and plays it in headless Chrome (software WebGL). It fails on any page error and on broken core
 // mechanics: hunt start, combat (attack turns, telegraphs, perfect dodge, counter), target lock, camera
-// collision, creature pathing and the touch layout. Run it with `npm test`; CI runs it before every deploy.
+// collision, creature pathing, the guide to the objective, the valley map and the touch layout.
+// Run it with `npm test`; CI runs it before every deploy.
 // CHROME_PATH picks the browser; otherwise the usual Chrome / Chromium / Edge install paths are tried.
 // Everything waits on game state, not wall time: software rendering runs at a few frames per second.
 import http from 'node:http';
@@ -471,6 +472,43 @@ async function desktop(browser, url, errors) {
     }), house[1] + 2, hz, house[0] - 2, hz);
     check('a ghoul behind a house walks around it', chase.reached, chase);
   }
+
+  // guidance: in the mill chapter the route follows the roads over the bridge, the objective marker shows
+  // on screen, M opens the valley map (the hunt waits, the sheet gets painted) and M closes it
+  const guide = await page.evaluate(() => new Promise((res) => {
+    const { campaign, player, enemies } = __hs;
+    enemies.reset();
+    campaign.save.chapter = 2;
+    campaign.setupChapter();
+    player.pos.set(0, player.pos.y, 120);
+    let n = 0;
+    const tick = () => {
+      if (++n < 30) return requestAnimationFrame(tick);
+      const path = __hs.hud.path || [], wp = document.getElementById('waypoint');
+      res({
+        corners: path.length,
+        overBridge: path.some((p) => Math.abs(p.x) < 1 && p.z > 20 && p.z < 70),
+        endsAtCoffin: !!path.length && path[path.length - 1] === campaign.task.coffin,
+        marker: !wp.hidden && /\d+ m/.test(wp.textContent),
+      });
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('guide: route to the mill follows the roads over the bridge, marker on screen', guide.corners > 4 && guide.overBridge && guide.endsAtCoffin && guide.marker, guide);
+  await page.keyboard.press('KeyM');
+  const mapOpen = await page.waitForFunction(() => __hs.state() === 'map' && !document.getElementById('worldmap').classList.contains('hidden'), { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  await frames(page, 3);
+  const sheet = await page.evaluate(() => {
+    const c = document.getElementById('wmCanvas'), g = c.getContext('2d');
+    const px = g.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data;
+    const t0 = __hs.enemies.clock;
+    return { w: c.width, h: c.height, painted: px[3] === 255 && px[0] + px[1] + px[2] > 150, t0, title: document.getElementById('wmTitle').textContent };
+  });
+  await frames(page, 10);
+  sheet.paused = await page.evaluate((t0) => __hs.enemies.clock === t0, sheet.t0);
+  await page.keyboard.press('KeyM');
+  const mapClosed = await page.waitForFunction(() => __hs.state() === 'play' && document.getElementById('worldmap').classList.contains('hidden'), { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('valley map: M opens it (hunt paused, sheet painted) and closes it', mapOpen && sheet.w > 100 && sheet.painted && sheet.paused && /CAP\. III/.test(sheet.title) && mapClosed, { mapOpen, ...sheet, mapClosed });
   await page.close();
 }
 
@@ -549,6 +587,11 @@ async function gamepad(browser, url, errors) {
   await press(4); // LB
   const locked = await page.waitForFunction(() => __hs.lock.target, { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('controller: LB locks a target', locked);
+  await press(13); // D-pad down
+  const padMap = await page.waitForFunction(() => __hs.state() === 'map', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  await press(1); // B
+  const padBack = await page.waitForFunction(() => __hs.state() === 'play', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('controller: D-pad down opens the valley map, B closes it', padMap && padBack, { padMap, padBack });
   await press(9); // Start
   const paused = await page.waitForFunction(() => __hs.state() === 'pause', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('controller: Start pauses', paused);
@@ -581,6 +624,14 @@ async function touch(browser, url, errors) {
   if (box) await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
   const locked = await page.waitForFunction(() => __hs.lock.target, { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('touch ALVO button locks a target', !!box && locked);
+  // a tap on the minimap opens the valley map, a tap on the map goes back to the hunt
+  const mini = await (await page.$('#tbMap'))?.boundingBox();
+  if (mini) await page.touchscreen.tap(mini.x + mini.width / 2, mini.y + mini.height / 2);
+  const tapMap = await page.waitForFunction(() => __hs.state() === 'map' && document.getElementById('touch').classList.contains('hidden'), { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  await page.waitForFunction(() => performance.now() - __hs.worldMap.openAt > 500, WAIT);
+  await page.touchscreen.tap(60, 60);
+  const tapBack = await page.waitForFunction(() => __hs.state() === 'play' && !document.getElementById('touch').classList.contains('hidden'), { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('touch: tapping the minimap opens the valley map, a tap closes it', !!mini && tapMap && tapBack, { tapMap, tapBack });
   await page.close();
 }
 

@@ -27,7 +27,7 @@ const nC = createNoise2D(mulberry32(4242));
 
 export const mapE = (x, z) => Math.hypot((x - MAP.cx) / MAP.ax, (z - MAP.cz) / MAP.az);
 export const riverZ = (x) => 42 + Math.sin(x * 0.018) * 14 + Math.sin(x * 0.045 + 1) * 4;
-const LAKE = { x: -150, z: -50, r: 30 };
+export const LAKE = { x: -150, z: -50, r: 30 };
 const RZ0 = riverZ(0);
 
 export const PLACES = [
@@ -105,7 +105,7 @@ function roadDist(x, z) {
   return best;
 }
 
-const FORESTS = [
+export const FORESTS = [
   { x: 75, z: 125, r: 45, d: 0.012 },
   { x: -60, z: 150, r: 30, d: 0.01 },
   { x: -150, z: 120, r: 35, d: 0.01 },

@@ -539,6 +539,12 @@ const S = {
     osc(o, t + 0.06, 'sine', 1320, 1320, 0.15, 0.14, 0.002);
   },
   cancel(t) { osc(out(null, 0.1), t, 'triangle', 700, 450, 0.1, 0.25, 0.002); },
+  // the valley map unfolding (open) or folding away: two dry rustles of paper
+  paper(t, open = true) {
+    const o = out(null, 0.05);
+    noise(o, t, 'bandpass', open ? 1600 : 3200, open ? 3600 : 1400, 0.14, 0.3, 0.9, 0.01);
+    noise(o, t + 0.08, 'highpass', 2400, 4800, open ? 0.22 : 0.12, 0.18, 0.7, 0.02);
+  },
   deny(t) {
     const o = out(null, 0);
     osc(o, t, 'square', 150, 140, 0.08, 0.1, 0.002);

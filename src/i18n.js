@@ -25,11 +25,11 @@ export function translatePage() {
     '<span>WASD</span> move &nbsp; <span>Mouse</span> camera &nbsp; <span>Shift</span> run &nbsp; <span>Space</span> jump<br />' +
     '<span>Left click</span> sword (3-hit combo) &nbsp; <span>Right click / Ctrl</span> dodge &nbsp; <span>Q / F</span> silver crossbow &nbsp; <span>R</span> lock target<br />' +
     '<span>V</span> blade Art (full Fury) &nbsp; <span>1-6 / X / wheel</span> swap rune<br />' +
-    'Vampires burn at dawn · Red eyes: dodge at the last instant to counter &nbsp; <span>Esc</span> pause &nbsp; <span>M</span> sound');
+    'Vampires burn at dawn · Red eyes: dodge at the last instant to counter &nbsp; <span>Esc</span> pause &nbsp; <span>M</span> map &nbsp; <span>N</span> sound');
   set('.controls.touch-only',
     '<span>Left side</span> move &nbsp; <span>Right side</span> drag the camera<br />' +
     '<span>Sword</span> hold for the combo &nbsp; <span>Dodge</span> <span>Bow</span> <span>Jump</span> <span>Run</span> <span>Target</span><br />' +
-    '<span>Art</span> with full Fury &nbsp; <span>Rune</span> swaps the blade\'s power<br />' +
+    '<span>Art</span> with full Fury &nbsp; <span>Rune</span> swaps the blade\'s power &nbsp; <span>Minimap</span> tap for the valley map<br />' +
     'Vampires burn at dawn · Red eyes: dodge at the last instant to counter');
   set('.rotate-hint', '↻ Turn the device sideways to play better');
   set('#play', 'HUNT');
@@ -49,4 +49,5 @@ export function translatePage() {
   label('#touch [data-key="KeyR"]', 'Lock target');
   label('#tbArt', 'Blade Art');
   label('#tbRune', 'Swap rune');
+  label('#tbMap', 'Map');
 }

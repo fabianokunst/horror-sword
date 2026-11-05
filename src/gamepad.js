@@ -3,8 +3,9 @@
 // case. What a button does depends on the context main.js reports:
 //   play  — left stick move, right stick camera, A jump, B dodge, X/RB sword (hold for the combo), Y crossbow,
 //           RT blade Arte, D-pad ◀ ▶ sword runes, LB/R3 lock target, LT/L3 sprint, Back inventory, Start pause,
-//           D-pad up pick up
-//   ui    — inventory and perk cards: D-pad / left stick move the cursor, A confirm, B back, Back/Start close
+//           D-pad up pick up, D-pad down the valley map
+//   ui    — inventory, perk cards and the valley map: D-pad / left stick move the cursor, A confirm, B back,
+//           Back/Start close
 //   menu  — title, pause, death and victory screens: A or Start presses the main button, B closes the settings
 const DEAD = 0.18; // stick dead zone
 const LOOK = 1100; // camera speed at full right-stick tilt, in mouse pixels per second
@@ -107,6 +108,7 @@ export class Gamepads {
       tap(B.BACK, 'Tab');
       tap(B.START, 'GamepadPause');
       tap(B.UP, 'KeyE');
+      tap(B.DOWN, 'KeyM');
     } else if (ctx === 'ui') {
       const tap = (i, code) => { if (edge(i)) { inp.press(code); inp.release(code); } };
       tap(B.A, 'Enter');

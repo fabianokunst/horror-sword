@@ -20,7 +20,7 @@ O jogo precisa do build: abrir o `index.html` da raiz direto (ou servir a raiz d
 npm test         # ~30 s: monta uma cópia de desenvolvimento, joga no Chrome sem janela e confere o básico
 ```
 
-[`tests/smoke.mjs`](tests/smoke.mjs) gera um build de desenvolvimento numa pasta temporária (mantém o gancho `window.__hs`), serve numa porta livre e joga no Chrome instalado (variável `CHROME_PATH` para escolher outro). Falha se houver qualquer erro na página ou se quebrar: início da caçada, vez de atacar, aviso de golpe, esquiva perfeita e contra-ataque, runas (efeitos dos golpes e Arte), trilha da espada e criaturas mortas caídas no chão, trava de alvo, colisão da câmera, criaturas contornando uma casa e o layout dos botões de toque. Como usa pasta e porta próprias, várias sessões podem rodar ao mesmo tempo. As páginas do teste ignoram controles de verdade ligados ao computador (o Chrome sem janela também os enxerga e um botão apertado iniciaria a caçada sozinho); o teste do controle usa um controle simulado.
+[`tests/smoke.mjs`](tests/smoke.mjs) gera um build de desenvolvimento numa pasta temporária (mantém o gancho `window.__hs`), serve numa porta livre e joga no Chrome instalado (variável `CHROME_PATH` para escolher outro). Falha se houver qualquer erro na página ou se quebrar: início da caçada, vez de atacar, aviso de golpe, esquiva perfeita e contra-ataque, runas (efeitos dos golpes e Arte), trilha da espada e criaturas mortas caídas no chão, trava de alvo, colisão da câmera, criaturas contornando uma casa, a rota até o objetivo (pelas estradas e pela ponte) com o marcador na tela, o mapa do vale (abrir e fechar no teclado, no controle e no toque, com a caçada pausada) e o layout dos botões de toque. Como usa pasta e porta próprias, várias sessões podem rodar ao mesmo tempo. As páginas do teste ignoram controles de verdade ligados ao computador (o Chrome sem janela também os enxerga e um botão apertado iniciaria a caçada sozinho); o teste do controle usa um controle simulado.
 
 ### Publicar (GitHub Pages)
 
@@ -42,7 +42,8 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Tab / I | inventário (no celular: botão ITENS) |
 | Mouse nas telas de escolha | no inventário, nas cartas de dom e no mercador aparece um ponteiro em forma de espada: aponte (ele fica dourado sobre o que dá para clicar) e clique; botão direito volta |
 | E | pegar item brilhando no chão · rezar no santuário · falar com o mercador |
-| M | liga/desliga o som (também há o botão SOM no menu) |
+| M | **mapa do vale** (M de novo ou clique direito fecha; veja Mapa e guia) |
+| N | liga/desliga o som (também há o botão SOM no menu) |
 | Esc | pausa |
 
 ### Controle (Xbox, PlayStation e similares)
@@ -59,10 +60,11 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | LB / R3 | travar alvo |
 | LT / L3 | correr (segurando) |
 | Direcional ↑ | pegar item · no inventário e nas cartas de dom: mover o cursor |
+| Direcional ↓ | mapa do vale (B ou ↓ fecha) |
 | Back / Select | inventário |
 | Start | pausa / continuar |
 
-O controle vibra ao levar golpe e na esquiva perfeita (onde o navegador permite). Em **Configurações → Controles** dá para mudar a sensibilidade da câmera (mouse, toque e controle), inverter o eixo vertical e desligar a vibração; em **Som**, os volumes de música, efeitos e ambiente.
+O controle vibra ao levar golpe e na esquiva perfeita (onde o navegador permite). Em **Configurações → Controles** dá para mudar a sensibilidade da câmera (mouse, toque e controle), inverter o eixo vertical e desligar a vibração; em **Mapa**, se o minimapa gira com a câmera e se o marcador do objetivo aparece na tela; em **Som**, os volumes de música, efeitos e ambiente.
 
 ### Celular e tablet
 
@@ -80,6 +82,7 @@ Funciona de celulares pequenos (iPhone SE) a monitores ultrawide, em paisagem ou
 | CORRER | liga a corrida; desliga ao soltar o analógico |
 | ITENS / ❚❚ | inventário / pausa |
 | Toque no aviso do item | pegar item |
+| Toque no minimapa | mapa do vale (toque de novo para voltar) |
 
 Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisagem). Se o app for para segundo plano, o jogo pausa. Usar mouse/teclado ou toque no meio da partida troca o esquema de controle automaticamente.
 
@@ -109,7 +112,7 @@ Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisa
 
 ## Campanha
 
-A caçada é dividida em capítulos; cada um tem um objetivo (linha no topo da tela, alvo ◆ no minimapa):
+A caçada é dividida em capítulos; cada um tem um objetivo (linha no topo da tela, alvo ◆ no minimapa e na tela; veja Mapa e guia):
 
 | Cap. | Nome | Objetivo |
 |---|---|---|
@@ -133,6 +136,14 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 
 **Evolução:** almas dão experiência; cada nível dá +4 de vida, +2% de dano e a escolha de 1 entre 3 **dons** (vigor, couraça, fôlego, lâmina rúnica, alcance, golpe de misericórdia, sede de sangue, colheita de almas, aljava, prata benta, mãos ágeis, virote perfurante, passo fantasma, pés ligeiros, ira santa (Fúria enche mais rápido), ressonância (efeitos das runas mais fortes), mestre de armas (Artes mais fortes); cada um com vários níveis). Concluir um capítulo dá meio nível de bônus. Os títulos mudam a cor da lâmina, da lanterna e dos golpes: Aprendiz (ciano) → Juramentado (nv 5, ouro) → Matador de Vampiros (10, carmesim) → Inquisidor (15, violeta) → Lenda da Noite (22, prata). No level-up o jogo pausa: toque/clique na carta, teclas 1-2-3 ou mova o mouse e clique.
 
+**Mapa e guia:** quando o objetivo é um lugar (os caixões, o pátio do castelo), o jogo mostra o caminho de três jeitos:
+
+- **Na tela:** um ◆ dourado com a distância flutua sobre o objetivo; fora da vista, ele fica preso na borda com uma seta para o lado certo (embaixo quando está às suas costas).
+- **Minimapa:** gira com a câmera (para cima é para onde você olha; o **N** vermelho na borda marca o norte), com as estradas em destaque e uma trilha de pontos dourados até o objetivo. Fora do alcance, uma seta na borda mostra a direção e a distância. Embaixo dele aparecem a tecla do mapa e o nome do lugar onde você está.
+- **Mapa do vale** (M, ↓ no controle ou toque no minimapa): o vale inteiro desenhado em pergaminho, com relevo, rio, florestas, estradas e o nome de cada lugar, os santuários (apagados depois de usados na noite), o mercador, os caixões do Conde (riscados quando destruídos), você e, em tinta vermelha, o objetivo e o caminho até ele. A caçada pausa enquanto ele está aberto.
+
+A rota (`src/route.js`) segue as estradas sempre que isso compensa em vez de cortar pelo mato: atravessa o rio pela ponte e só sai da estrada no último trecho. Em **Configurações → Mapa** dá para fixar o norte no minimapa e esconder o marcador da tela.
+
 **Santuários e mercador:** os 8 santuários de beira de estrada (✝ dourado no minimapa) são pontos de descanso: **E** (toque no aviso, ou ↑ no controle) para rezar — vida, stamina e virotes cheios e o progresso é salvo ali, então ao cair você volta ao último santuário. Cada santuário atende uma vez por noite (a luz fica fraca depois). As almas (✦ no HUD) são também moeda: o **mercador** na praça de Borgo (¤ no minimapa) vende Erva Verde (8), Erva Vermelha (10), Água Benta (18), Ervas Mistas V+R (30) e Incenso de Ira (25, enche a Fúria). O jogo pausa enquanto a loja está aberta (1-5 / ← → Enter / toque / controle).
 
 **Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo e ao rezar num santuário (posição, hora do dia, nível, dons, inventário, almas, runas e maestria). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
@@ -153,6 +164,8 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes; efeitos das runas nas criaturas (fogo, lentidão e congelamento, selo de luz que explode ao cair).
 - `src/interact.js`, `src/interact.css` — santuários (rezar: cura, recarga e checkpoint, uma vez por noite) e o mercador de Borgo (loja com almas, aviso na tela tocável).
 - `src/nav.js` — navegação das criaturas a pé: grade de 1 m numa janela de 112 m em volta do caçador, desenhada a partir dos círculos de colisão do mundo (refeita a cada 2 m andados ou 1 s), teste de linha de visão e campo de fluxo (Dijkstra em 8 direções) calculado só quando alguma criatura perde o caçador de vista.
+- `src/route.js` — rota até o objetivo: as estradas viram um grafo (cruzamentos e bifurcações) e o caminho segue por elas quando sair da estrada (mato, morros, rio) sairia mais caro.
+- `src/worldmap.js`, `src/worldmap.css` — mapa do vale: o relevo é pintado uma vez (a partir de `heightAt`, com sombreamento e curvas de nível) quando o jogo está ocioso; árvores, montanhas, estradas, desenhos dos lugares e nomes são feitos no tamanho da tela; por cima, a cada quadro, santuários, caixões, o caçador, o objetivo e a rota.
 - `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
 - `src/camcollide.js` — colisão da câmera: um raio por quadro da cabeça do caçador até a câmera, contra as construções (malhas grandes como o castelo são divididas em pedaços de 6 m para o raio testar só os triângulos próximos) e o relevo. Paredes e telhados puxam a câmera na hora; ela volta suave quando o caminho abre; colada demais, o caçador some para não tapar a tela. Árvores ficam de fora de propósito (a câmera ficaria entrando e saindo nas florestas).
 - `src/campaign.js` — capítulos e objetivos, escala por capítulo/ciclo, XP e level-up, checkpoints, morte por dificuldade e novo jogo+.
@@ -162,7 +175,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/gamepad.js` — controles de videogame (mapeamento padrão): botões viram as mesmas teclas virtuais do teclado, conforme o contexto (jogo, inventário/dons, menus).
 - `src/touch.js` — controles de toque (analógico, câmera, botões); viram teclas virtuais no `Input`, então o loop do jogo não distingue toque de teclado.
 - `src/audio.js` — todo o som é sintetizado em tempo real (veja abaixo).
-- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, trilha da lâmina (fita suavizada que acompanha a espada em cada golpe, na cor da runa ou do título), ondas de choque e raios, HUD/minimapa, entrada e loop/ciclo dia-noite (a ondulação da água roda no shader de vértice). O build separa o three.js (`assets/three-*.js`) do código do jogo, então uma atualização só baixa de novo a parte que mudou.
+- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, trilha da lâmina (fita suavizada que acompanha a espada em cada golpe, na cor da runa ou do título), ondas de choque e raios, HUD (minimapa que gira com a câmera, marcador do objetivo na tela), entrada e loop/ciclo dia-noite (a ondulação da água roda no shader de vértice). O build separa o three.js (`assets/three-*.js`) do código do jogo, então uma atualização só baixa de novo a parte que mudou.
 
 ## Som
 
