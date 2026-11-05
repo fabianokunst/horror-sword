@@ -2,12 +2,13 @@
 import '@fontsource/pirata-one';
 import '@fontsource/vt323';
 import * as THREE from 'three';
-import { RetroRenderer, lambert, glowSprite } from './ps1.js';
+import { RetroRenderer, lambert, glowSprite, pixelTexture } from './ps1.js';
 import { World, heightAt, WATER, findSpawn, CASTLE } from './world.js';
 import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Effects } from './effects.js';
 import { Input } from './input.js';
+import { UiCursor } from './cursor.js';
 import { TouchControls } from './touch.js';
 import { Hud } from './hud.js';
 import { Inventory } from './inventory.js';
@@ -19,6 +20,7 @@ import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
 import { Interact } from './interact.js';
+import { Blade } from './runes.js';
 import { L, EN, translatePage, setLang } from './i18n.js';
 
 const CYCLE = 240; // seconds for a full day/night
@@ -76,9 +78,7 @@ const moonTex = (() => {
   g.beginPath(); g.arc(16, 16, 15, 0, Math.PI * 2); g.fill();
   g.fillStyle = 'rgba(120,120,150,0.5)';
   for (const [x, y, r] of [[11, 12, 4], [20, 19, 3], [18, 9, 2], [10, 21, 2]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
-  const t = new THREE.CanvasTexture(c);
-  t.magFilter = THREE.NearestFilter;
-  return t;
+  return pixelTexture(new THREE.CanvasTexture(c));
 })();
 const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, fog: false, color: 0xe8ecff }));
 moon.scale.setScalar(38);
@@ -118,6 +118,9 @@ enemies.world = world;
 const input = new Input(renderer.domElement);
 const touch = new TouchControls(input);
 const pads = new Gamepads(input);
+// the mouse pointer drawn on the choice screens, where the real one stays locked (and hidden)
+const ptr = new UiCursor();
+const choosing = () => state === 'inv' || state === 'levelup' || state === 'shop';
 // camera sensitivity, inverted Y and vibration from the settings panel (applied in applyPrefs below)
 const prefs = { sens: 1, invertY: false, vibrate: true };
 const LOOK_K = 0.0024; // radians per mouse pixel at 100% sensitivity
@@ -155,6 +158,7 @@ enemies.onPerfectDodge = () => {
   fx.burst(player.pos.clone().setY(player.pos.y + 1), player.rank.color, 24, { speed: 6, up: 2, gravity: 0, life: 0.5, size: 0.12 });
   hud.toast(L('✦ Esquiva perfeita — contra-ataque!', '✦ Perfect dodge — counter!'));
   buzz(30, 0.3);
+  blade.perfectDodge();
 };
 // the Count changes phase: title card, organ and thunder, and a shockwave that throws the hunter back
 enemies.onBossPhase = (e, stage) => {
@@ -170,12 +174,30 @@ enemies.onBossPhase = (e, stage) => {
 enemies.onStagger = () => { hud.toast(L('Atordoado pelo grito! Esquive quando ela inspirar.', 'Stunned by the scream! Dodge when she draws breath.')); fx.shake += 0.4; };
 enemies.onKill = (e) => campaign.onKill(e);
 const prevKill = enemies.onKill;
-enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); };
+enemies.onKill = (e) => { prevKill?.(e); inv.loot(e); blade.onKill(e); };
+// sword runes: the blade's element, the Fúria bar and the Artes (runes.js)
+const blade = new Blade({ scene, player, enemies, fx, hud, world });
+blade.dmgMul = () => inv.damageMul;
+blade.keyName = () => (input.touch ? L('ARTE', 'ART') : pads.active ? 'RT' : 'V');
+player.onArt = () => blade.fire();
+blade.onFire = (hits) => {
+  hitstop = hits ? 0.12 : 0.04;
+  fx.shake += 0.8;
+  buzz(90, 0.9);
+};
+const _dust = new THREE.Vector3();
 player.onSwing = (combo, def) => {
   sfx.swing(combo);
   const heavy = def.vertical || def.counter; // counter hits after a perfect dodge land like the finisher
-  fx.slash(player.pos, player.facing, def.vertical, combo === 2 || def.counter ? player.rank.finisher : player.rank.color);
-  const hits = enemies.hitArc(player, inv.damageMul > 1 ? { ...def, dmg: def.dmg * inv.damageMul } : def);
+  fx.slash(player.pos, player.facing, def.vertical, blade.slashColor(combo === 2 || def.counter));
+  // the overhead finisher hits the ground in front of the hunter: a spray of earth where the blade lands
+  if (def.vertical) fx.burst(_dust.set(player.pos.x + Math.sin(player.facing) * 2, player.pos.y + 0.1, player.pos.z + Math.cos(player.facing) * 2), 0x7a6a50, 14, { speed: 4, up: 2.5, life: 0.5, size: 0.13 });
+  const struck = [];
+  const hits = enemies.hitArc(player, inv.damageMul > 1 ? { ...def, dmg: def.dmg * inv.damageMul } : def, (e) => {
+    struck.push(e);
+    blade.strike(e, def);
+  });
+  blade.afterSwing(struck, def, combo);
   if (hits) player.heal(hits * player.stats.lifesteal); // "Sede de Sangue" perk
   const n = hits + world.hitCoffins(player, def, fx);
   if (n > 0) {
@@ -190,6 +212,8 @@ player.onSwing = (combo, def) => {
 let finalFight = false;
 const campaign = new Campaign({ world, enemies, player, hud, fx });
 campaign.inv = inv;
+campaign.blade = blade;
+inv.blade = blade; // the Incenso de Ira fills the Fúria bar
 campaign.onVictory = () => setTimeout(showWin, 3500);
 // shrines (rest + checkpoint) and Borgo's merchant
 const interact = new Interact({ scene, world, player, campaign, inv, hud, fx });
@@ -290,7 +314,7 @@ retryBtn.addEventListener('click', () => {
   startRun(campaign.next);
 });
 
-// level-up: the game freezes on a choice of three perks (tap, click, 1-2-3 or a mouse sweep under pointer lock)
+// level-up: the game freezes on a choice of three perks (tap, click with the pointer, arrows or 1-2-3)
 function openLevelUp() {
   const info = campaign.perkInfo();
   if (!info) return;
@@ -465,12 +489,17 @@ function audioFrame(dt, time) {
   if (player.grounded && !player.roll && !player.dead && sp > 1 && (stepDist += sp * dt) > 1.85) {
     stepDist = 0;
     sfx.step(player.swimming, sp > 8);
+    // sprinting kicks up dust at every footfall
+    if (sp > 8 && !player.swimming) fx.burst(player.pos.clone().setY(player.pos.y + 0.05), 0x7a6a50, 3, { speed: 1.5, up: 1, life: 0.35, size: 0.1 });
   }
   if (!player.grounded) {
     if (airT === 0 && player.vel.y > 4) sfx.jump();
     airT += dt;
   } else {
-    if (airT > 0.25 && !player.swimming) sfx.land();
+    if (airT > 0.25 && !player.swimming) {
+      sfx.land();
+      fx.burst(player.pos.clone().setY(player.pos.y + 0.05), 0x7a6a50, 10, { speed: 3, up: 1, life: 0.45, size: 0.12 });
+    }
     airT = 0;
   }
   if (player.bolts > lastBolts) sfx.reload();
@@ -507,7 +536,7 @@ function frame() {
   let dt = rawDt;
   if (hitstop > 0) { hitstop -= rawDt; dt = rawDt * 0.05; }
   // controllers first: their buttons become this frame's virtual keys
-  pads.update(rawDt, state === 'play' ? 'play' : state === 'inv' || state === 'levelup' || state === 'shop' ? 'ui' : 'menu');
+  pads.update(rawDt, state === 'play' ? 'play' : choosing() ? 'ui' : 'menu');
 
   if (state === 'play' || state === 'dead') {
     // slow motion after a perfect dodge, easing back to full speed over its last quarter second
@@ -566,6 +595,11 @@ function frame() {
         enemies.fireBolt(from, dir.normalize(), player.stats.boltDmg, player.stats.pierce);
         sfx.bolt();
       } else if ((input.hit('KeyQ') || input.hit('KeyF') || input.hit('Mouse1')) && !player.bolts) sfx.empty();
+      // sword runes: V unleashes the Arte; 1-6 pick a rune, X / the wheel / the D-pad cycle through them
+      if (input.hit('KeyV')) blade.unleash();
+      if (input.hit('KeyX') || input.hit('WheelDown')) blade.next(1);
+      if (input.hit('WheelUp') || input.hit('RunePrev')) blade.next(-1);
+      for (let i = 0; i < 6; i++) if (input.hit(`Digit${i + 1}`)) blade.slot(i);
       if (input.hit('KeyM')) { toggleMute(); soundLabel(); }
       if (input.hit('KeyE')) useOrPickup();
       if (input.hit('Tab') || input.hit('KeyI')) { state = 'inv'; inv.open(); touch.show(false); }
@@ -582,7 +616,10 @@ function frame() {
     if (world.gate.open && !finalFight && !player.dead && world.inArena(player.pos.x, player.pos.z)) startFinalFight();
 
     player.update(dt, mv, world, time);
+    // the swinging blade leaves a trail in the rune's (or the rank's) color
+    if (player.anim.trail) fx.blade(player.anim.bladeBase, player.anim.bladeTip, blade.slashColor(player.attack?.combo === 2 || player.counter > 0 || !!player.art));
     enemies.update(dt, { player, dayAmt, time, world, spawn: campaign.spawn });
+    blade.update(dt, state === 'play');
     world.update(player.pos.x, player.pos.z, time, dt);
 
     if (player.dead && state === 'play') {
@@ -664,6 +701,9 @@ function frame() {
   camera.lookAt(camTarget);
 
   retro.render(scene, camera);
+  // after this frame's state changes: until the next one the mouse points at the choice screen or plays
+  input.ui = choosing();
+  ptr.show(input.ui && input.locked && !input.touch);
   input.endFrame();
 }
 frame();
@@ -675,7 +715,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 if (import.meta.env.DEV) {
   window.__hs = {
-    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, input, ptr, blade, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
     state: () => state, witch: () => witch, cam: () => camYaw, camDist: () => camDist,
     setCam: (yaw, pitch) => { camYaw = yaw; if (pitch != null) camPitch = pitch; },
   };

@@ -1,0 +1,26 @@
+/* the game's pointer (src/cursor.js): the system cursor while the mouse is free, a drawn copy while it is locked */
+html { cursor: var(--cur, auto); }
+select, input { cursor: var(--cur-on, pointer); }
+
+#ptr {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(1px 2px 0 rgba(0, 0, 0, 0.55));
+}
+#ptr > div { position: absolute; inset: 0; }
+#ptr svg { display: block; transform-origin: 2px 2px; transition: transform 0.06s; }
+#ptr .on, #ptr.lit .off { display: none; }
+#ptr.lit .on { display: block; }
+#ptr.down svg { transform: scale(0.82); }
+
+/* the hover look for what the drawn pointer is over (a locked mouse never triggers :hover) */
+button.hot { background: #a0102a; }
+button.secondary.hot { background: #3a1a10; }
+#perks .perk.hot, #wares .ware.hot { background: rgba(106, 8, 24, 0.92); }
+.inv-opt.hot:not(.on) { background: #2a0a12; }

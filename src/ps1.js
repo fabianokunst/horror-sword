@@ -1,9 +1,15 @@
 // PS1-style rendering: low internal resolution with integer pixel scaling, vertex snapping, affine and
 // down-sampled textures, palette reduction with ordered dithering, and an optional CRT monitor pass.
-// Everything is driven live by RetroRenderer.apply(settings) (see settings.js).
+// The "smooth finish" turns the same scene into plain modern 3D: smooth shading, filtered textures,
+// multisampled edges and soft shadows. Everything is driven live by RetroRenderer.apply(settings) (see settings.js).
 import * as THREE from 'three';
 
 export const RENDER_HEIGHT = 320;
+
+// what the smooth finish switches: every ps1() material (recompiled for the shadow filter), the ones
+// authored faceted, and the pixel-art textures (nearest filtering)
+const MATS = new Set(), FACETED = new Set(), PIXEL_TEX = new Set();
+let smooth = false;
 
 // shared by every ps1() material
 const U = {
@@ -61,7 +67,27 @@ function patchShader(shader, material, selfLit, snapVerts) {
 export function ps1(material, selfLit = 0, snapVerts = true) {
   material.onBeforeCompile = (shader) => patchShader(shader, material, selfLit, snapVerts);
   material.customProgramCacheKey = () => 'ps1:' + selfLit + ':' + snapVerts;
+  MATS.add(material);
+  if (material.flatShading) {
+    FACETED.add(material);
+    material.flatShading = !smooth;
+  }
   return material;
+}
+
+// Crisp texels in the retro look, filtered (mipmapped) under the smooth finish.
+export function pixelTexture(t) {
+  PIXEL_TEX.add(t);
+  return filterTexture(t);
+}
+
+function filterTexture(t) {
+  t.magFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
+  t.minFilter = smooth ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
+  t.generateMipmaps = smooth;
+  t.anisotropy = smooth ? 8 : 1; // clamped to what the GPU supports
+  t.needsUpdate = true;
+  return t;
 }
 
 export function lambert(color, opts = {}) {
@@ -80,12 +106,9 @@ export function canvasTexture(size, draw, seed = 1) {
   let s = seed;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   draw(g, size, rnd);
-  const t = new THREE.CanvasTexture(c);
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
+  const t = pixelTexture(new THREE.CanvasTexture(c));
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
-  t.generateMipmaps = false;
   return t;
 }
 
@@ -155,13 +178,13 @@ export function glowSprite(color, scale = 2, opacity = 0.8) {
 // sRGB values, compared after tone mapping and gamma (the space the player actually sees)
 const rgb = (h) => new THREE.Vector3(((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255);
 const PALETTES = {
+  full: { levels: 256 }, // what the 8-bit image already holds: no reduction
   rgb15: { levels: 32 },
   rgb12: { levels: 16 },
   rgb9: { levels: 8 },
   rgb6: { levels: 4 },
   // night blues, blood reds, lantern golds, moss greens and rune cyan
   gothic: {
-    spread: 0.12,
     colors: [
       0x08060c, 0x16121e, 0x1e2038, 0x2c3456, 0x445080, 0x6a7aa4, 0x9dabb9, 0xd4d8e0,
       0xf6eedc, 0x3a1220, 0x6a1426, 0xa81c30, 0xe8364a, 0xff8a70, 0xc88a6a, 0x5a2a5e,
@@ -197,7 +220,6 @@ uniform int uDither;      // 0 off, 1 bayer 2x2, 2 bayer 4x4, 3 bayer 8x8, 4 sta
 uniform float uDitherAmt; // in quantization steps
 uniform int uPalMode;     // 0 per-channel levels, 1 nearest palette color, 2 luminance ramp
 uniform float uLevels;
-uniform float uSpread;
 uniform int uPalN;
 uniform vec3 uPal[32];
 varying vec2 vUv;
@@ -223,16 +245,21 @@ void main() {
     float y = dot(c, vec3(0.299, 0.587, 0.114));
     c = uPal[int(clamp(floor((y + d / L) * L + 0.5), 0.0, L))];
   } else {
-    c += d * uSpread;
-    float best = 1e9;
-    vec3 pick = c;
+    // dither only between the two nearest palette colors, in proportion to where c lies between them
+    // (a plain offset + nearest search jumps to colors of another hue and dissolves shapes into speckle)
+    const vec3 W = vec3(0.3, 0.59, 0.11);
+    float b1 = 1e9, b2 = 1e9;
+    vec3 c1 = c, c2 = c;
     for (int i = 0; i < 32; i++) {
       if (i >= uPalN) break;
       vec3 e = c - uPal[i];
-      float dist = dot(e * e, vec3(0.3, 0.59, 0.11));
-      if (dist < best) { best = dist; pick = uPal[i]; }
+      float dist = dot(e * e, W);
+      if (dist < b1) { b2 = b1; c2 = c1; b1 = dist; c1 = uPal[i]; }
+      else if (dist < b2) { b2 = dist; c2 = uPal[i]; }
     }
-    c = pick;
+    vec3 span = c2 - c1;
+    float t = clamp(dot((c - c1) * W, span) / max(dot(span * W, span), 1e-6), 0.0, 1.0);
+    c = d + 0.5 < t ? c2 : c1;
   }
   gl_FragColor = vec4(c, 1.0);
 }
@@ -295,11 +322,14 @@ void main() {
     h /= 12.0;
     col += h * h * uBloom * 1.2;
   }
-  if (uScan > 0.0) {
+  // beams need a few screen rows each: at 2-3 rows per line (small or low-DPI screens) they alias against
+  // the pixel grid, and the curvature bends that into moiré rings, so they fade out there
+  float scan = uScan * clamp((uScale - 1.5) / 2.5, 0.0, 1.0);
+  if (scan > 0.0) {
     // one screen row falls on the gap between beams; bright pixels get wider beams
     float f = fract(p.y) - 0.5 + 0.5 / uScale;
     float s = mix(0.2, 0.42, clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0));
-    col *= mix(1.0, exp(-f * f / (2.0 * s * s)) * 1.55, uScan);
+    col *= mix(1.0, exp(-f * f / (2.0 * s * s)) * 1.55, scan);
   }
   if (uMask > 0.0) {
     float m = mod(floor(gl_FragCoord.x), 3.0);
@@ -326,6 +356,8 @@ export class RetroRenderer {
     this.renderer = renderer;
     // some mobile GPUs can't render to half-float targets; fall back to 8-bit (just clips the HDR highlights)
     const hdr = renderer.extensions.has('EXT_color_buffer_half_float') || renderer.extensions.has('EXT_color_buffer_float');
+    // multisampled edges for the smooth finish; a half-float target can only be multisampled with EXT_color_buffer_float
+    this.msaa = !hdr || renderer.extensions.has('EXT_color_buffer_float') ? Math.min(4, renderer.capabilities.maxSamples || 0) : 0;
     this.target = new THREE.WebGLRenderTarget(4, 4, {
       type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
       minFilter: THREE.NearestFilter,
@@ -345,7 +377,6 @@ export class RetroRenderer {
       uDitherAmt: { value: 1 },
       uPalMode: { value: 0 },
       uLevels: { value: 32 },
-      uSpread: { value: 0 },
       uPalN: { value: 0 },
       uPal: { value: Array.from({ length: 32 }, () => new THREE.Vector3()) },
     });
@@ -384,7 +415,6 @@ export class RetroRenderer {
     const list = pal.colors || pal.ramp || [];
     q.uPalMode.value = pal.levels ? 0 : pal.ramp ? 2 : 1;
     q.uLevels.value = pal.levels || 2;
-    q.uSpread.value = pal.spread || 0;
     q.uPalN.value = list.length;
     list.forEach((h, i) => q.uPal.value[i].copy(rgb(h)));
 
@@ -401,6 +431,7 @@ export class RetroRenderer {
     d.uNoise.value = s.noise * crt;
     d.uVignette.value = s.vignette / 100;
 
+    if (s.smooth !== smooth) this.setSmooth(s.smooth);
     if (s.lines !== this.lines || s.wobble !== this.wobble) {
       this.lines = s.lines;
       this.wobble = s.wobble;
@@ -408,11 +439,27 @@ export class RetroRenderer {
     }
   }
 
+  // smooth finish: smooth shading on the faceted models, filtered textures, multisampled edges, soft shadows
+  setSmooth(on) {
+    smooth = on;
+    const r = this.renderer;
+    for (const m of FACETED) m.flatShading = !on;
+    for (const m of MATS) m.needsUpdate = true; // recompiled: shading, and the new shadow filter
+    for (const t of PIXEL_TEX) filterTexture(t);
+    r.shadowMap.type = on ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
+    r.shadowMap.needsUpdate = true;
+    const samples = on ? this.msaa : 0;
+    if (this.target.samples !== samples) {
+      this.target.samples = samples;
+      this.target.dispose(); // rebuilt with the new sample count on its next use
+    }
+  }
+
   // Sizes follow the renderer's drawing buffer, so call this after renderer.setSize().
   setSize() {
     const { x: W, y: H } = this.renderer.getDrawingBufferSize(this.screen);
-    // the short side gets ~`lines` pixels; each one is an exact square of screen pixels
-    const scale = Math.max(1, Math.round(Math.min(W, H) / this.lines));
+    // the short side gets ~`lines` pixels (0: the screen's own resolution); each one is an exact square of screen pixels
+    const scale = this.lines ? Math.max(1, Math.round(Math.min(W, H) / this.lines)) : 1;
     const rw = Math.ceil(W / scale), rh = Math.ceil(H / scale);
     this.target.setSize(rw, rh);
     this.low.setSize(rw, rh);

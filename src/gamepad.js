@@ -1,8 +1,9 @@
 // Game controllers (standard mapping: Xbox / PlayStation / most USB and Bluetooth pads). Polled every frame and
 // turned into the same virtual keys the keyboard and the touch buttons use, so the game loop needs no special
 // case. What a button does depends on the context main.js reports:
-//   play  — left stick move, right stick camera, A jump, B dodge, X/RB sword (hold for the combo), Y/RT crossbow,
-//           LB/R3 lock target, LT/L3 sprint, Back inventory, Start pause, D-pad up pick up
+//   play  — left stick move, right stick camera, A jump, B dodge, X/RB sword (hold for the combo), Y crossbow,
+//           RT blade Arte, D-pad ◀ ▶ sword runes, LB/R3 lock target, LT/L3 sprint, Back inventory, Start pause,
+//           D-pad up pick up
 //   ui    — inventory and perk cards: D-pad / left stick move the cursor, A confirm, B back, Back/Start close
 //   menu  — title, pause, death and victory screens: A or Start presses the main button, B closes the settings
 const DEAD = 0.18; // stick dead zone
@@ -98,7 +99,9 @@ export class Gamepads {
       tap(B.A, 'Space');
       tap(B.B, 'KeyC');
       tap(B.Y, 'KeyQ');
-      tap(B.RT, 'KeyQ');
+      tap(B.RT, 'KeyV');
+      tap(B.LEFT, 'RunePrev');
+      tap(B.RIGHT, 'KeyX');
       tap(B.LB, 'KeyR');
       tap(B.R3, 'KeyR');
       tap(B.BACK, 'Tab');

@@ -12,33 +12,34 @@ export const roman = (n) => ROMAN[n - 1] || String(n);
 
 // One chapter per step of the hunt. After the Count falls, the next cycle replays them with stronger
 // creatures, more elites and every creature type roaming (see applyScaling / spawnConfig).
+// `rune`: the sword rune revealed when the chapter is completed (runes.js).
 export const CHAPTERS = [
   {
     title: L('A Primeira Noite', 'The First Night'), intro: L('O sol se põe sobre a Transilvânia...', 'The sun sets over Transylvania...'),
-    goal: { kind: 'survive' },
+    goal: { kind: 'survive' }, rune: 'brasa',
     density: 6, night: ['ghoul', 'ghoul', 'ghoul', 'bat'], day: ['ghoul'],
   },
   {
     title: L('O Cemitério', 'The Cemetery'), intro: L('Algo dorme sob as lápides.', 'Something sleeps beneath the headstones.'),
-    goal: { kind: 'coffin', id: 'cemetery', place: L('do Cemitério', 'in the Cemetery') },
+    goal: { kind: 'coffin', id: 'cemetery', place: L('do Cemitério', 'in the Cemetery') }, rune: 'sangria',
     guards: [{ type: 'vampire', n: 2 }, { type: 'ghoul', n: 4 }],
     density: 8, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul'],
   },
   {
     title: L('Uivos no Moinho', 'Howls at the Mill'), intro: L('A matilha protege o seu senhor.', 'The pack guards its master.'),
-    goal: { kind: 'coffin', id: 'windmill', place: L('do Moinho', 'at the Mill') },
+    goal: { kind: 'coffin', id: 'windmill', place: L('do Moinho', 'at the Mill') }, rune: 'tempestade',
     guards: [{ type: 'wolf', n: 1, name: L('LOBO ALFA', 'ALPHA WOLF'), hp: 6, scale: 1.5 }, { type: 'wolf', n: 3 }],
     density: 10, night: ['wolf', 'wolf', 'ghoul', 'ghoul', 'vampire', 'bat', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
     title: L('As Noivas da Abadia', 'The Brides of the Abbey'), intro: L('Três vozes cantam entre as ruínas.', 'Three voices sing among the ruins.'),
-    goal: { kind: 'coffin', id: 'abbey', place: L('da Abadia', 'in the Abbey') },
+    goal: { kind: 'coffin', id: 'abbey', place: L('da Abadia', 'in the Abbey') }, rune: 'geada',
     guards: [{ type: 'bride', n: 3, name: L('NOIVA DO CONDE', "THE COUNT'S BRIDE"), hp: 3, scale: 1.15, shade: true }],
     density: 11, night: ['bride', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'ghoul', 'witch'], day: ['ghoul', 'wolf'],
   },
   {
     title: L('Lua de Sangue', 'Blood Moon'), intro: L('O selo do castelo se alimenta de sangue.', "The castle's seal feeds on blood."),
-    goal: { kind: 'kills', n: 30, night: true }, bloodMoon: true, gate: true,
+    goal: { kind: 'kills', n: 30, night: true }, bloodMoon: true, gate: true, rune: 'aurora',
     density: 14, night: ['ghoul', 'vampire', 'vampire', 'bat', 'bat', 'wolf', 'wolf', 'bride', 'witch'], day: ['ghoul', 'wolf', 'wolf'],
   },
   {
@@ -64,6 +65,7 @@ export class Campaign {
     this.dayT = DUSK;
     this.isNight = false;
     this.inv = null; // optional inventory with save()/load()
+    this.blade = null; // optional sword runes (runes.js) with load()/grant()
     this.onVictory = null;
     this.setupChapter();
     // every soul is experience and one coin for Borgo's merchant
@@ -112,6 +114,9 @@ export class Campaign {
     // the untouched inventory of the first start is the kit every brand-new hunt begins with
     this.freshInv ??= this.inv?.save?.();
     this.inv?.load?.(save.inventory || this.freshInv);
+    // the runes this hunt has earned (saves from before the runes get theirs from the chapters already done)
+    const done = save.cycle > 0 ? CHAPTERS : CHAPTERS.slice(0, save.chapter);
+    this.blade?.load(save, done.map((c) => c.rune).filter(Boolean));
     if (!save.savedAt) this.checkpoint(false); // a brand-new hunt is saved right away
     if (save.cycle > 0 && save.chapter === 0) this.hud.message(`${L('CICLO', 'CYCLE')} ${roman(save.cycle + 1)}`, L('As criaturas retornam mais fortes...', 'The creatures return stronger...'), 4);
     this.announce();
@@ -259,6 +264,7 @@ export class Campaign {
     if (s.chapter === CHAPTERS.length - 1) return this.victory();
     this.hud.message(title, sub, 4);
     sfx.bell(2);
+    if (ch.rune) this.blade?.grant(ch.rune);
     if (ch.gate) {
       this.world.openGate?.();
       this.hud.message(L('OS PORTÕES SE ABREM', 'THE GATES OPEN'), L('O Castelo Drácula aguarda...', 'Castle Dracula awaits...'), 5);
@@ -277,6 +283,8 @@ export class Campaign {
     s.stats.souls = this.enemies.souls;
     this.report = { cycle: s.cycle + 1, level: s.level, rank: rankOf(s.level).name, ...s.stats };
     updateRecords(s, this.global + 1);
+    // each new cycle lets the sword runes grow one mastery level further (IV, then V)
+    if (s.cycle < 2) this.hud.message(L('AS RUNAS DESPERTAM', 'THE RUNES AWAKEN'), L(`No próximo ciclo as runas chegam ao nível ${s.cycle ? 'V' : 'IV'}.`, `Next cycle the runes can reach level ${s.cycle ? 'V' : 'IV'}.`), 4);
     // the next cycle starts back in the village at dusk
     s.cycle++;
     s.chapter = 0;
@@ -309,6 +317,7 @@ export class Campaign {
     const rank = rankOf(s.level);
     if (rank !== before) {
       this.player.setRank(rank);
+      if (this.blade) this.blade.dirty = true; // bare steel takes the rank's color
       this.hud.message(L('NOVO TÍTULO', 'NEW TITLE'), `${rank.name} — ${L('sua lâmina brilha com uma nova cor.', 'your blade glows with a new color.')}`, 4);
     }
     this.persistProgress();
@@ -339,7 +348,7 @@ export class Campaign {
   persistProgress() {
     if (!this.diff.keepXp) return;
     const s = this.save;
-    Object.assign(this.snapshot, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse });
+    Object.assign(this.snapshot, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse, runes: s.runes && cloneSave(s.runes) });
     writeSave(this.snapshot);
   }
 
@@ -362,7 +371,7 @@ export class Campaign {
     // back to the last checkpoint, keeping lifetime stats (and, on easy, the hunter's growth)
     const next = cloneSave(this.snapshot);
     next.stats = { ...s.stats };
-    if (D.keepXp) Object.assign(next, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse });
+    if (D.keepXp) Object.assign(next, { level: s.level, xp: s.xp, picks: s.picks, perks: { ...s.perks }, purse: s.purse, runes: s.runes && cloneSave(s.runes) });
     writeSave(next);
     this.next = next;
   }

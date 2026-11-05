@@ -13,6 +13,7 @@ export const ITEMS = {
   mixGR: { name: L('Ervas Mistas (V+R)', 'Mixed Herbs (G+R)'), desc: L('Erva verde e vermelha moídas juntas. Cura todos os ferimentos.', 'Green and red herbs ground together. Heals all wounds.'), heal: Infinity },
   mixGGG: { name: L('Ervas Mistas (V+V+V)', 'Mixed Herbs (G+G+G)'), desc: L('Três ervas verdes moídas juntas. Cura todos os ferimentos.', 'Three green herbs ground together. Heals all wounds.'), heal: Infinity },
   water: { name: L('Água Benta', 'Holy Water'), desc: L('Frasco abençoado na abadia. Unja a lâmina: dano em dobro por 30 segundos.', 'A vial blessed at the abbey. Anoint the blade: double damage for 30 seconds.'), bless: 30 },
+  incense: { name: L('Incenso de Ira', 'Wrath Incense'), desc: L('Resina queimada diante da lâmina. Enche a barra de Fúria na hora: a Arte fica pronta.', 'Resin burned before the blade. Fills the Fury bar at once: the Art is ready.'), fury: true },
 };
 
 export const EQUIP = {
@@ -86,6 +87,21 @@ function vial(box, cyl) {
   box(0.1, 0.035, 0.02, 0xf0bc40, 0, 0.17, 0.12);
 }
 
+// brass censer on three chains, embers glowing in the ash
+function censer(box, cyl) {
+  cyl(0.06, 0.08, 0.05, 8, 0x8a6a2a, 0, 0.025, 0);
+  cyl(0.17, 0.1, 0.15, 8, 0xb08a3a, 0, 0.12, 0);
+  cyl(0.18, 0.18, 0.03, 8, 0xd8b050, 0, 0.2, 0);
+  cyl(0.14, 0.14, 0.02, 8, 0x3a2a20, 0, 0.21, 0);
+  box(0.07, 0.05, 0.07, 0xff6a1a, 0.03, 0.23, 0, { glow: 1.6 });
+  box(0.05, 0.04, 0.05, 0xffd040, -0.04, 0.23, 0.04, { glow: 1.6 });
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    box(0.012, 0.34, 0.012, 0xc8a050, Math.sin(a) * 0.1, 0.38, Math.cos(a) * 0.1, { rx: -Math.cos(a) * 0.45, rz: Math.sin(a) * 0.45 });
+  }
+  cyl(0.03, 0.03, 0.03, 6, 0xd8b050, 0, 0.55, 0);
+}
+
 function sword(box) {
   box(0.07, 0.95, 0.025, 0xdce6f4, 0, 0.6, 0);
   box(0.02, 0.8, 0.03, 0x40e8ff, 0, 0.58, 0, { glow: 1.6 });
@@ -110,6 +126,7 @@ const BUILDERS = {
   mixGR: mortar([GREEN[0], RED[0], GREEN[1], RED[1]]),
   mixGGG: mortar([...GREEN, 0x58e050, ...GREEN]),
   water: vial,
+  incense: censer,
   sword,
   crossbow,
 };
@@ -186,7 +203,7 @@ export class Pickups {
         world.collide(q, 0.7);
         if (W.heightAt(q.x, q.z) < W.WATER + 0.4) { this.cells.set(key, null); continue; }
         const r = rnd();
-        this.cells.set(key, this.spawn(r < 0.55 ? 'herbG' : r < 0.8 ? 'herbR' : 'water', q.x, q.z, { cell: key }));
+        this.cells.set(key, this.spawn(r < 0.55 ? 'herbG' : r < 0.8 ? 'herbR' : r < 0.92 ? 'water' : 'incense', q.x, q.z, { cell: key }));
       }
   }
 

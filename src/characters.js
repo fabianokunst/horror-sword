@@ -132,9 +132,10 @@ class Rig {
     this.parts.push({ geo, bones: Array.isArray(bones) ? bones : [bones], glow });
     return this;
   }
-  // props are authored in model space and re-parented to a bone
-  prop(bone, build) {
+  // props are authored in model space and re-parented to a bone (a name lets the animation show/hide them)
+  prop(bone, build, name) {
     const g = new THREE.Group();
+    if (name) g.name = name;
     build(g);
     bake(g, PROP_MAT, PROP_GLOW, true);
     this.props.push({ bone, obj: g });
@@ -262,13 +263,15 @@ function buildHunter() {
   const R = new Rig();
   humanBones(R);
   R.bone('scarf', 'chest', [0.06, 1.55, -0.13], [0.09, 1.12, -0.2]);
+  // the back of the coat skirt hangs from its own bone, so it can flap behind a running hunter
+  R.bone('coat', 'hips', [0, 0.95, -0.14], [0, 0.42, -0.3]);
   humanBody(R, { skin: C.skin, top: C.coat, pants: C.pants, boot: C.boot, sleeve: C.coat, cuff: C.gold, glove: C.leather, belt: C.leather, collar: C.shirt });
   // open long coat skirt (front left open so the legs read)
   R.add(tube([
     { p: [0, 1.08, 0], r: [0.19, 0.125], c: C.coat }, { p: [0, 0.9, -0.01], r: [0.235, 0.16], c: C.coatDk },
     { p: [0, 0.65, -0.03], r: [0.29, 0.2], c: C.coatDk }, { p: [0, 0.43, -0.05], r: [0.32, 0.23], c: C.coatDk },
     { p: [0, 0.4, -0.05], r: [0.322, 0.232], c: C.gold },
-  ], { arc: [Math.PI / 2 + 0.55, Math.PI * 2.5 - 0.55], segs: 16 }), ['spine', 'hips', 'legL', 'legR']);
+  ], { arc: [Math.PI / 2 + 0.55, Math.PI * 2.5 - 0.55], segs: 16 }), ['spine', 'hips', 'legL', 'legR', 'coat']);
   // shirt front, gold trims, bandolier with holy-water vials, shoulder guards
   R.add(ellipsoid([0, 1.42, 0.095], [0.075, 0.12, 0.04], C.shirt), ['chest']);
   for (const sx of [1, -1]) R.add(tube([{ p: [0.085 * sx, 1.52, 0.11], r: 0.012, c: C.gold }, { p: [0.1 * sx, 1.1, 0.12], r: 0.012, c: C.gold }], { segs: 5 }), ['chest', 'spine']);
@@ -300,11 +303,17 @@ function buildHunter() {
     cyl(g, 0.145, 0.145, 0.04, 12, C.band, 0, 1.93, 0);
     box(g, 0.04, 0.05, 0.02, C.gold, 0.08, 1.93, 0.13);
   });
-  // crossbow slung on the back
+  // crossbow slung on the back; a shot draws it into the left hand (stock along the hand's -y, the aiming line)
   R.prop('chest', (g) => {
     box(g, 0.06, 0.6, 0.06, C.leather, 0.02, 1.3, -0.17, { rz: -0.5 });
     box(g, 0.55, 0.04, 0.04, C.gold, -0.04, 1.42, -0.2, { rz: -0.5 });
-  });
+  }, 'backBow');
+  R.prop('handL', (g) => {
+    box(g, 0.05, 0.42, 0.06, C.leather, 0.285, 0.74, 0.03);
+    box(g, 0.5, 0.035, 0.04, C.gold, 0.285, 0.56, 0.03);
+    box(g, 0.46, 0.012, 0.012, 0xe8e0d0, 0.285, 0.62, 0.03);
+    box(g, 0.016, 0.3, 0.016, 0xc0f8ff, 0.285, 0.66, 0.07, { glow: 2 });
+  }, 'handBow');
   // runic sword: blade continues the arm line (local -y of the hand) so arm swings aim it
   R.prop('handR', (g) => {
     const hx = -0.285, hy = 0.875;

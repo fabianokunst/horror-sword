@@ -556,6 +556,71 @@ const S = {
     for (const m of [62, 66, 69, 74]) voice(o, t, [hz(m)], 1.8, 0.1, 'a', { v2: 'o', sus: true, a: 0.3, vib: 0.008 });
     bell(o, t, 880, 0.04, 2.5);
   },
+
+  // ---- sword runes (runes.js)
+  // a rune slides into the blade: a stone click and a ringing note in the rune's own pitch
+  rune(t, note = 74) {
+    const o = out(null, 0.4);
+    osc(o, t, 'triangle', 500, 260, 0.05, 0.25, 0.001);
+    noise(o, t, 'bandpass', 2400, 1600, 0.04, 0.25, 3, 0.001);
+    const f = hz(note);
+    for (const [r, a] of [[1, 0.07], [2.01, 0.035], [2.76, 0.02]]) osc(o, t + 0.03, 'sine', f * r, f * r, 0.9, a, 0.003);
+  },
+  // the Fúria bar is full: a rising swell and two bright chimes
+  furyReady(t) {
+    const o = out(null, 0.5);
+    noise(o, t, 'bandpass', 300, 2400, 0.5, 0.25, 2, 0.3);
+    [81, 88].forEach((m, i) => osc(o, t + 0.35 + i * 0.09, 'sine', hz(m), hz(m), 0.7, 0.07, 0.002));
+  },
+  // a creature freezes solid: glassy crackle over a cold hiss
+  freeze(t, pos) {
+    if (!free('freeze', 0.06)) return;
+    const o = out(pos, 0.3);
+    noise(o, t, 'highpass', 5000, 8000, 0.35, 0.2, 0.7, 0.01);
+    for (let i = 0; i < 5; i++) osc(o, t + i * 0.03, 'sine', rnd(2500, 4200), rnd(1800, 2400), 0.06, 0.06, 0.001);
+  },
+  // chain lightning between creatures: a sharp crack and a buzzing tail
+  zap(t, pos) {
+    if (!free('zap', 0.05)) return;
+    const o = out(pos, 0.25);
+    noise(o, t, 'highpass', 3000, 1500, 0.08, 0.6, 0.8, 0.001);
+    osc(o, t, 'sawtooth', 220, 110, 0.25, 0.12, 0.002);
+    osc(o, t, 'square', 1800, 600, 0.12, 0.05, 0.001);
+  },
+  // a sealed creature bursts in holy light: a bright bell strike with a soft whoosh
+  holy(t, pos) {
+    if (!free('holy', 0.05)) return;
+    const o = out(pos, 0.5);
+    bell(o, t, 660 * rnd(0.97, 1.03), 0.05, 1.4);
+    noise(o, t, 'bandpass', 1800, 600, 0.35, 0.3, 1.5, 0.01);
+  },
+  // the Artes: each rune unleashes its own sound
+  art(t, kind = 'aco') {
+    const o = out(null, 0.5);
+    osc(o, t, 'sine', 140, 38, 0.6, 0.6, 0.004); // the blow lands
+    noise(o, t, 'lowpass', 2000, 120, 0.6, 0.6, 1, 0.003);
+    if (kind === 'aco') {
+      noise(o, t, 'bandpass', 500, 3200, 0.5, 0.6, 1.8, 0.1);
+      const b = 1580;
+      osc(o, t, 'sine', b, b, 0.8, 0.06, 0.002);
+      osc(o, t, 'sine', b * 1.5, b * 1.5, 0.6, 0.04, 0.002);
+    } else if (kind === 'brasa') {
+      noise(o, t, 'lowpass', 900, 200, 1.4, 0.7, 0.8, 0.05); // roar of the flames
+      for (let i = 0; i < 8; i++) noise(o, t + rnd(0, 1), 'bandpass', rnd(1500, 5000), 1200, 0.02, 0.25, 2, 0.001);
+    } else if (kind === 'geada') {
+      noise(o, t, 'highpass', 6000, 2500, 1.1, 0.35, 0.7, 0.02);
+      for (let i = 0; i < 9; i++) osc(o, t + i * 0.04, 'sine', rnd(2200, 4400), rnd(1500, 2200), 0.12, 0.06, 0.001);
+    } else if (kind === 'tempestade') {
+      thunder(out(null, 0.5), t, 0.9);
+      noise(o, t, 'highpass', 4000, 1500, 0.12, 0.8, 0.8, 0.001);
+    } else if (kind === 'hemo') {
+      noise(o, t, 'bandpass', 300, 1400, 0.7, 0.7, 2, 0.08);
+      voice(o, t, [180, 120], 0.9, 0.4, 'o', { v2: 'u', rough: 0.2 });
+    } else if (kind === 'aurora') {
+      for (const m of [62, 69, 74, 78, 81]) voice(o, t, [hz(m)], 2.2, 0.08, 'a', { v2: 'o', sus: true, a: 0.05, vib: 0.006 });
+      bell(o, t, 880, 0.06, 2.5);
+    }
+  },
 };
 
 export const sfx = {};

@@ -1,0 +1,29 @@
+/* sword runes (runes.js): the badge under the health bars — rune glyph and level, the runes found so far —
+   and the Fúria bar, which pulses when the Arte is ready; plus the ARTE / RUNA touch buttons */
+#rune {
+  --rc: #40e8ff;
+  margin: 0 0 clamp(4px, 0.6vmin, 8px);
+  font-size: clamp(15px, 2.05vmin, 30px);
+  line-height: 1.1;
+  text-shadow: 2px 2px 0 #000;
+}
+.rn-top { display: flex; align-items: baseline; gap: 0.4em; white-space: nowrap; }
+.rn-g { min-width: 0.9em; font-size: 1.25em; color: var(--rc); text-shadow: 0 0 6px var(--rc), 2px 2px 0 #000; }
+.rn-n { letter-spacing: 1px; }
+.rn-set { font-size: 0.85em; letter-spacing: 3px; color: #5a4a30; }
+.rn-set .own { color: #a89880; }
+.rn-set .on { color: var(--rc); }
+.rn-k:empty { display: none; }
+.rn-k { color: #f0d080; border: 1px solid #5a4a30; background: #1a1008; padding: 0 5px; font-size: 0.85em; }
+#rune .bar.fury { height: clamp(5px, 0.7vmin, 9px); width: 72%; margin: 3px 0 0; }
+#rune .rn-fill { width: 0; background: var(--rc); opacity: 0.7; }
+#rune.ready .bar.fury { outline-color: #ffe080; animation: rn-pulse 0.7s ease-in-out infinite alternate; }
+#rune.ready .rn-fill { opacity: 1; }
+@keyframes rn-pulse {
+  from { box-shadow: 0 0 2px var(--rc); }
+  to { box-shadow: 0 0 12px var(--rc), 0 0 3px #fff; }
+}
+
+#tbArt.ready { --rc: #ffd060; border-color: #ffe080; color: #fff4d0; background: rgba(150, 90, 10, 0.75); animation: rn-pulse 0.7s ease-in-out infinite alternate; }
+#tbRune { --rc: #f0d080; }
+.rn-tg { font-size: 1.6em; line-height: 1; font-weight: normal; color: var(--rc); text-shadow: 0 0 6px var(--rc); }

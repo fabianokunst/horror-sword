@@ -52,7 +52,6 @@ export class Inventory {
     this.shown = 0;
     this.flashT = 0;
     this.sparkT = 0;
-    this.mx = this.my = 0;
     this.ecg = { ys: new Float32Array(160), head: 0, acc: 0, phase: 0, amp: 1 };
     this.lamp = null; // the lantern color saved while the blade is blessed
     this.promptHtml = '';
@@ -162,12 +161,14 @@ export class Inventory {
     const slots = this.slots.map((_, i) => {
       const s = el('div', 'inv-slot', grid, '<img alt="">');
       s.addEventListener('click', () => this.tapSlot(i));
+      s.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') this.hoverSlot(i); });
       return s;
     });
     const menu = el('div', 'inv-menu hidden', grid);
     const opts = ACTIONS.map(([, label], j) => {
       const o = el('div', 'inv-opt', menu, label);
       o.addEventListener('click', (e) => { e.stopPropagation(); this.menuIdx = j; this.ok(); });
+      o.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && this.menuIdx !== j) { this.menuIdx = j; sfx.cursor?.(); } });
       return o;
     });
 
@@ -223,7 +224,7 @@ export class Inventory {
     if (e.T?.boss) { drop('water', -0.7, Infinity); drop('mixGR', 0.7, Infinity); return; }
     if (Math.random() > (LOOT[e.type] ?? 0.1)) return;
     const r = Math.random();
-    drop(r < 0.6 ? 'herbG' : r < 0.85 ? 'herbR' : 'water');
+    drop(r < 0.55 ? 'herbG' : r < 0.8 ? 'herbR' : r < 0.92 ? 'water' : 'incense');
   }
 
   get damageMul() { return this.blessed > 0 ? 2 : 1; }
@@ -240,7 +241,6 @@ export class Inventory {
   open() {
     this.isOpen = true;
     this.mode = 'grid';
-    this.mx = this.my = 0;
     this.dom.root.classList.remove('hidden');
     this.dom.prompt.classList.add('hidden');
     this.dom.blessHud.classList.add('hidden');
@@ -261,15 +261,10 @@ export class Inventory {
   handle(input) {
     if (!this.isOpen) return false;
     const hit = (...codes) => codes.some((c) => input.hit(c));
-    let dx = hit('KeyD', 'ArrowRight') - hit('KeyA', 'ArrowLeft');
-    let dy = hit('KeyS', 'ArrowDown') - hit('KeyW', 'ArrowUp');
-    // with the pointer locked, the mouse nudges the cursor too
-    this.mx += input.dx;
-    this.my += input.dy;
-    if (Math.abs(this.mx) > 90) { dx += Math.sign(this.mx); this.mx = 0; }
-    if (Math.abs(this.my) > 90) { dy += Math.sign(this.my); this.my = 0; }
+    const dx = hit('KeyD', 'ArrowRight') - hit('KeyA', 'ArrowLeft');
+    const dy = hit('KeyS', 'ArrowDown') - hit('KeyW', 'ArrowUp');
     if (hit('Tab', 'KeyI', 'Escape')) this.close();
-    else if (hit('KeyE', 'Enter', 'Space', 'Mouse0')) this.ok();
+    else if (hit('KeyE', 'Enter', 'Space')) this.ok();
     else if (hit('KeyQ', 'Backspace', 'KeyC', 'Mouse2')) this.back();
     else if (dx || dy) this.move(dx, dy);
     return this.isOpen;
@@ -313,6 +308,14 @@ export class Inventory {
     sfx.cancel?.();
   }
 
+  // the mouse pointer over a slot moves the selection there (the action menu stays on its own slot)
+  hoverSlot(i) {
+    if ((this.mode !== 'grid' && this.mode !== 'combine') || i === this.cursor) return;
+    this.cursor = i;
+    if (this.mode === 'grid') this.describe();
+    sfx.cursor?.();
+  }
+
   tapSlot(i) {
     if (this.mode === 'combine') { this.cursor = i; return this.finishCombine(); }
     this.mode = 'grid';
@@ -333,6 +336,13 @@ export class Inventory {
       this.say(`${L('Você usou', 'You used')}: ${it.name}.`);
       sfx.heal?.();
       this.fx?.burst(p.pos.clone().setY(p.pos.y + 1), 0x60ff80, 16, { speed: 2, up: 3, gravity: -2, life: 0.8 });
+    } else if (it.fury) {
+      // the sword runes (runes.js, set by main.js)
+      const b = this.blade;
+      if (!b || b.fury >= b.max) return this.say(L('A Fúria já está no máximo.', 'Your Fury is already full.'), true);
+      b.fill();
+      this.slots[this.cursor] = null;
+      this.say(L('A fumaça envolve a lâmina. A Fúria transborda!', 'The smoke wraps the blade. Fury overflows!'));
     } else if (it.bless) {
       this.blessed = Math.min(BLESS_MAX, this.blessed + it.bless);
       this.slots[this.cursor] = null;
@@ -464,7 +474,9 @@ export class Inventory {
     d.state.textContent = label;
     d.state.style.color = color;
     this.drawEcg(dt, color, rate, k <= 0.2);
-    d.blessLbl.textContent = this.blessed > 0 ? `✝ ${Math.ceil(this.blessed)}s` : '';
+    // the rune in the blade (glyph + mastery level) and the holy water's timer
+    const b = this.blade, rune = b ? `${b.rune.glyph} ${b.label().split(' ').pop()}` : '';
+    d.blessLbl.textContent = [rune, this.blessed > 0 ? `✝ ${Math.ceil(this.blessed)}s` : ''].filter(Boolean).join(' ');
     d.ammo.textContent = p.bolts != null ? `➶ ${p.bolts}` : '';
 
     // rotating preview of the selected item

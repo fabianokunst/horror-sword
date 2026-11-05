@@ -280,7 +280,7 @@ button {
   color: #ffe0c0;
   background: #6a0818;
   border: 3px solid #e8b53a;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
   letter-spacing: 3px;
   box-shadow: 4px 4px 0 #000;
   touch-action: manipulation;
@@ -391,7 +391,7 @@ input.switch {
   height: 22px;
   border: 2px solid #5a4a30;
   background: #1a1008;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
 }
 input.switch::after {
   content: '';

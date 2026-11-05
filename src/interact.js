@@ -16,6 +16,7 @@ export const WARES = [
   { id: 'herbR', price: 10 },
   { id: 'water', price: 18 },
   { id: 'mixGR', price: 30 },
+  { id: 'incense', price: 25 },
 ];
 
 const el = (tag, cls, parent, html) => {
@@ -41,7 +42,6 @@ export class Interact {
       this.merchant = { ...spot, m, look: spot.facing };
     }
     this.sel = 0;
-    this.acc = 0;
     this.isOpen = false;
     this.html = '';
     this.buildDom();
@@ -63,12 +63,13 @@ export class Interact {
       const b = el('button', 'ware', this.wares,
         `<span class="pk-n">${i + 1}</span><b>${ITEMS[w.id].name}</b><span class="wr-p">✦ ${w.price}</span><span class="pk-d">${ITEMS[w.id].desc}</span>`);
       b.addEventListener('click', () => { this.select(i); this.buy(i); });
+      b.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && i !== this.sel) this.select(i); });
       return b;
     });
     this.say = el('p', 'shop-say', shop, '&nbsp;');
     const close = el('button', 'secondary', shop, L('SAIR', 'LEAVE'));
     close.addEventListener('click', () => this.close());
-    el('p', 'lu-keys desk-only', shop, L('1 · 2 · 3 · 4 ou ← → e Enter — Esc para sair', '1 · 2 · 3 · 4 or ← → and Enter — Esc to leave'));
+    el('p', 'lu-keys desk-only', shop, L('1 a 5 ou ← → e Enter — Esc para sair', '1 to 5 or ← → and Enter — Esc to leave'));
   }
 
   get purse() { return this.campaign.save.purse || 0; }
@@ -116,7 +117,6 @@ export class Interact {
   open() {
     this.isOpen = true;
     this.sel = 0;
-    this.acc = 0;
     this.shop.classList.remove('hidden');
     this.talk(this.purse ? L('Almas por remédios, caçador. Escolha.', 'Souls for remedies, hunter. Take your pick.') : L('Sem almas, sem negócio. Volte quando tiver caçado.', 'No souls, no deal. Come back after the hunt.'));
     this.refresh();
@@ -163,12 +163,10 @@ export class Interact {
   handle(input) {
     if (!this.isOpen) return false;
     const hit = (...c) => c.some((k) => input.hit(k));
-    this.acc += input.dx;
-    if (Math.abs(this.acc) > 90) { this.select(this.sel + Math.sign(this.acc)); this.acc = 0; }
     if (hit('ArrowLeft', 'KeyA', 'ArrowUp', 'KeyW')) this.select(this.sel - 1);
     if (hit('ArrowRight', 'KeyD', 'ArrowDown', 'KeyS')) this.select(this.sel + 1);
     for (let i = 0; i < WARES.length; i++) if (hit(`Digit${i + 1}`, `Numpad${i + 1}`)) { this.select(i); this.buy(i); }
-    if (hit('Enter', 'Space', 'Mouse0')) this.buy(this.sel);
+    if (hit('Enter', 'Space')) this.buy(this.sel);
     if (hit('Escape', 'KeyC', 'Mouse2', 'Tab', 'KeyE')) this.close();
     return this.isOpen;
   }

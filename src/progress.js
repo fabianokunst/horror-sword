@@ -41,6 +41,10 @@ export const PERKS = {
   perfura: { name: L('Virote Perfurante', 'Piercing Bolt'), icon: '⇶', desc: L('Virotes atravessam mais uma criatura', 'Bolts pass through one more creature'), max: 2 },
   fantasma: { name: L('Passo Fantasma', 'Ghost Step'), icon: '◌', desc: L('Esquiva custa 30% menos stamina e vai mais longe', 'Dodging costs 30% less stamina and goes farther'), max: 2 },
   ligeiro: { name: L('Pés Ligeiros', 'Fleet Feet'), icon: '»', desc: L('+8% de velocidade', '+8% speed'), max: 3 },
+  // the sword runes and the Fúria bar (runes.js)
+  ira: { name: L('Ira Santa', 'Holy Wrath'), icon: '✷', desc: L('A Fúria enche 25% mais rápido', 'Fury fills 25% faster'), max: 3 },
+  ressoa: { name: L('Ressonância', 'Resonance'), icon: '◎', desc: L('Efeitos das runas 25% mais fortes (fogo, gelo, raio, sangue, luz)', 'Rune effects 25% stronger (fire, frost, lightning, blood, light)'), max: 3 },
+  arte: { name: L('Mestre de Armas', 'Weapon Master'), icon: '✶', desc: L('As Artes da lâmina causam +30% de dano', 'Blade Arts deal +30% damage'), max: 3 },
 };
 
 // XP needed to go from `level` to `level + 1`.
@@ -66,6 +70,9 @@ export function computeStats(save) {
     rollCost: 18 * (1 - r('fantasma') * 0.3),
     rollSpeed: 14 * (1 + r('fantasma') * 0.15),
     speedMul: 1 + r('ligeiro') * 0.08,
+    furyGain: 1 + r('ira') * 0.25,
+    runePow: 1 + r('ressoa') * 0.25,
+    artMul: 1 + r('arte') * 0.3,
   };
 }
 
@@ -98,6 +105,8 @@ export function addXp(save, amount) {
 export function newSave(difficulty = 'normal') {
   return {
     v: VERSION, difficulty, chapter: 0, cycle: 0, level: 1, xp: 0, picks: 0, perks: {}, purse: 0, // purse: souls to spend at the merchant
+    // sword runes found, the one in the blade and the kills made with each (mastery, see runes.js)
+    runes: { owned: ['aco'], active: 'aco', kills: {} },
     stats: { kills: 0, souls: 0, deaths: 0, time: 0 }, pos: null, savedAt: 0,
   };
 }

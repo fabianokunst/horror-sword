@@ -10,7 +10,7 @@
   font-size: clamp(18px, 3.4vmin, 28px);
   white-space: nowrap;
   text-shadow: 2px 2px 0 #000;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
 }
 #actPrompt b {
   font-weight: normal;

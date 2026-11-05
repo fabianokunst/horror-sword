@@ -89,8 +89,16 @@ const frames = (page, n) => page.evaluate((n) => new Promise((r) => {
   requestAnimationFrame(f);
 }), n);
 
+// Headless Chrome still reads the controllers plugged into the machine: a button press (or a drifting stick)
+// on a real pad would start the hunt or walk the hunter in the middle of a check. Pages hide them; the
+// controller check installs its own fake pad instead.
+const noPads = (page) => page.evaluateOnNewDocument(() => {
+  Object.defineProperty(navigator, 'getGamepads', { value: () => [], configurable: true });
+});
+
 // fresh hunt, unkillable hunter, no roaming spawns (each check places its own creatures)
 async function startHunt(page, tap = false) {
+  await noPads(page);
   // tests read Portuguese texts; headless Chrome would otherwise pick English from its locale
   await page.evaluateOnNewDocument(() => { try { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'pt'); } catch {} });
   await page.goto(page.__url);
@@ -259,6 +267,89 @@ async function desktop(browser, url, errors) {
   check("bride's scream stuns a hunter who doesn't dodge", moves.stunned, moves);
   await page.evaluate(() => __hs.enemies.reset());
 
+  // sword runes: finishing chapter I sets the Ember rune in the blade (and in the save), the 2 key picks it,
+  // its strikes set creatures on fire, frost freezes on the third hit, and a full Fúria bar unleashes the Arte (V)
+  const grant = await page.evaluate(() => {
+    const { campaign, blade, enemies } = __hs;
+    enemies.reset();
+    campaign.save.xp = 0; // the chapter's experience bonus must not open a level-up
+    const ch = campaign.save.chapter;
+    campaign.complete();
+    const ok = blade.id === 'brasa' && campaign.save.runes.owned.includes('brasa') && campaign.save.chapter === ch + 1;
+    blade.select('aco');
+    return { ok, owned: blade.state.owned, active: blade.id };
+  });
+  await page.keyboard.press('Digit2');
+  await frames(page, 3);
+  grant.key = await page.evaluate(() => __hs.blade.id);
+  check('runes: chapter I reveals the Ember rune, the 2 key sets it in the blade', grant.ok && grant.key === 'brasa', grant);
+
+  const strike = await page.evaluate(() => new Promise((res) => {
+    const { enemies, player, blade } = __hs;
+    __hs.setDay(0.8);
+    enemies.reset();
+    const a = player.facing;
+    const g = enemies.spawnAt('ghoul', player.pos.x + Math.sin(a) * 1.8, player.pos.z + Math.cos(a) * 1.8);
+    Object.assign(g, { hp: 50, maxHp: 50, cd: 1e9 });
+    const prev = player.onSwing;
+    player.onSwing = (c, def) => {
+      prev(c, def);
+      player.onSwing = prev;
+      // frost: three hits freeze a creature solid
+      blade.grant('geada');
+      const f = enemies.spawnAt('ghoul', player.pos.x - Math.sin(a) * 6, player.pos.z - Math.cos(a) * 6);
+      Object.assign(f, { hp: 50, maxHp: 50, cd: 1e9 });
+      for (let i = 0; i < 3; i++) blade.strike(f, { counter: false });
+      res({ burning: g.fire > 0, fury: blade.fury > 0, frozen: f.frozen > 0 });
+    };
+    // the bride's scream a few checks back may still have the hunter reeling (game time crawls in software rendering)
+    Object.assign(player, { stamina: 100, stun: 0, roll: null, attack: null });
+    player.tryAttack(a);
+    setTimeout(() => res({ timeout: true, busy: player.busy, attack: !!player.attack }), 60000);
+  }));
+  check('runes: Ember strikes burn, frost freezes on the 3rd hit, hits fill the Fúria bar', strike.burning && strike.frozen && strike.fury, strike);
+
+  await page.evaluate(() => {
+    const { blade, player } = __hs;
+    blade.select('brasa');
+    player.stamina = 100;
+    player.attack = null;
+  });
+  await crowd(page, 'ghoul', 4, 3);
+  await page.evaluate(() => {
+    for (const e of __hs.enemies.list) Object.assign(e, { hp: 50, maxHp: 50, cd: 1e9 });
+    __hs.blade.fill();
+  });
+  await page.keyboard.press('KeyV');
+  const art = await page.waitForFunction(() => {
+    const { player, blade, enemies } = __hs;
+    if (player.art || blade.fury > 0) return false; // the bar empties as the Arte starts; it lands before it ends
+    const L = enemies.list.filter((e) => !e.dying);
+    return { fury: blade.fury, hurt: L.filter((e) => e.hp < e.maxHp).length, burning: L.filter((e) => e.fire > 0).length, n: L.length };
+  }, { ...WAIT, timeout: 30000 }).then((h) => h.jsonValue(), () => ({ timeout: true }));
+  check('runes: V unleashes the Arte with a full bar, hitting every creature around', art.fury === 0 && art.n === 4 && art.hurt === 4 && art.burning === 4, art);
+  await page.evaluate(() => __hs.enemies.reset());
+
+  // animation: a swing draws the blade trail; a dead ghoul lies on the ground (its head low), not floating
+  // (far enough away that its soul orb doesn't fly to the hunter and open a level-up)
+  const anim = await page.evaluate(() => new Promise((res) => {
+    const { player, enemies } = __hs;
+    Object.assign(player, { stun: 0, attack: null, art: null, roll: null, stamina: 100 });
+    const e = enemies.spawnAt('ghoul', player.pos.x + 12, player.pos.z);
+    enemies.damage(e, 1e6, 1, 0);
+    player.tryAttack(player.facing);
+    let trail = false, n = 0;
+    const v = e.pos.clone();
+    const tick = () => {
+      if (player.anim.trail) trail = true;
+      if (e.dying > 0.8) { e.m.head.getWorldPosition(v); return res({ trail, head: +(v.y - e.pos.y).toFixed(2) }); }
+      if (++n < 600) requestAnimationFrame(tick); else res({ trail, timeout: true });
+    };
+    requestAnimationFrame(tick);
+  }));
+  check('animation: blade trail on a swing, dead creatures lie on the ground', anim.trail && anim.head < 0.6, anim);
+  await page.evaluate(() => __hs.enemies.reset());
+
   // shrine: E restores health and saves the hunt there, once per night
   const shrine = await page.evaluate(() => {
     const { player, world } = __hs;
@@ -302,6 +393,29 @@ async function desktop(browser, url, errors) {
   await page.keyboard.press('Escape');
   const shopClosed = await page.waitForFunction(() => __hs.state() !== 'shop', { ...WAIT, timeout: 20000 }).then(() => true, () => false);
   check('merchant: shop opens, sells for souls, closes', shopOpen && bought.purse === 12 && bought.herb && shopClosed, { shopOpen, ...bought, shopClosed });
+
+  // the drawn pointer: with the mouse locked (simulated: headless Chrome has no pointer lock) the level-up shows it,
+  // mouse deltas move it, the card under it lights up and a left click picks that card
+  await page.evaluate(() => { __hs.input.locked = true; __hs.campaign.save.picks = 1; });
+  const lvlOpen = await page.waitForFunction(() => __hs.state() === 'levelup', { ...WAIT, timeout: 20000 }).then(() => true, () => false);
+  await frames(page, 2);
+  const pointer = await page.evaluate(async () => {
+    const { ptr, campaign } = __hs;
+    const cards = [...document.querySelectorAll('#perks .perk')];
+    const want = cards.length - 1, card = cards[want];
+    const r = card.getBoundingClientRect();
+    const shown = !ptr.el.classList.contains('hidden');
+    dispatchEvent(new MouseEvent('mousemove', { movementX: r.left + r.width / 2 - ptr.x, movementY: r.top + r.height / 2 - ptr.y }));
+    const hover = card.classList.contains('sel') && card.classList.contains('hot') && ptr.el.classList.contains('lit');
+    const key = campaign.offer[want], before = campaign.save.perks[key] || 0;
+    await new Promise((res) => setTimeout(res, 700)); // the level-up ignores clicks for its first 0.6 s
+    dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+    return { shown, hover, picked: (campaign.save.perks[key] || 0) === before + 1 };
+  });
+  await frames(page, 2);
+  pointer.gone = await page.evaluate(() => __hs.state() === 'play' && __hs.ptr.el.classList.contains('hidden'));
+  await page.evaluate(() => { __hs.input.locked = false; });
+  check('pointer: drawn on the level-up under pointer lock, hovers and clicks a card', lvlOpen && pointer.shown && pointer.hover && pointer.picked && pointer.gone, { lvlOpen, ...pointer });
 
   // target lock on R, released on R
   await crowd(page, 'ghoul', 3, 6);
@@ -365,6 +479,7 @@ async function english(browser, url, errors) {
   const page = await browser.newPage();
   page.on('pageerror', (e) => errors.push('english: ' + e.message));
   await page.setViewport({ width: 640, height: 360 });
+  await noPads(page);
   await page.goto(url);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'en'); });
   await page.reload();
@@ -385,6 +500,7 @@ async function english(browser, url, errors) {
   // the title-screen button switches back to Portuguese (reload)
   const p2 = await browser.newPage();
   p2.on('pageerror', (e) => errors.push('english: ' + e.message));
+  await noPads(p2);
   await p2.goto(url);
   await p2.evaluate(() => { localStorage.clear(); localStorage.setItem('horror-sword:lang', 'en'); });
   await p2.reload();

@@ -1,4 +1,4 @@
-// Creatures of the night: spawning, AI, combat, soul orbs and crossbow bolts.
+// Creatures of the night: spawning, AI, combat, sword rune effects (fire, frost, seal), soul orbs and crossbow bolts.
 import * as THREE from 'three';
 import { makeModel, FLASH_MAT } from './characters.js';
 import { heightAt, groundAt, WATER } from './world.js';
@@ -6,6 +6,7 @@ import { basic, glowSprite } from './ps1.js';
 import { sfx } from './audio.js';
 import { NavGrid } from './nav.js';
 import { L } from './i18n.js';
+import { animateCreature, hitReact } from './creatureanim.js';
 
 export const TYPES = {
   ghoul: { model: () => 'ghoul', hp: 3, speed: 3.6, dmg: 10, range: 1.5, windup: 0.4, blood: 0x7cff3a, souls: 1, radius: 0.5 },
@@ -47,11 +48,22 @@ const SHOT_DMG = 0.6; // of his strike damage
 const HEX_MAT = basic(0x60ff90, 2.2);
 const LUNGE = { prep: 0.42, dur: 0.32, speed: 19 }; // vampire dash
 const SCREAM = { prep: 0.55, radius: 6.5, stun: 0.7, dmg: 0.4 }; // bride scream
+// what the animation needs from the AI each frame (creatureanim.js); wait and W are refreshed per creature
+const ANIM = { wait: false, W: 0, cast: CAST, lunge: LUNGE.prep, scream: SCREAM.prep, crouch: CROUCH };
 
 // roaming creatures when no campaign chapter is driving the spawns
 const DEFAULT_SPAWN = { max: 8, interval: 2.6, night: ['ghoul', 'ghoul', 'vampire', 'vampire', 'bat', 'bat'], day: ['ghoul', 'ghoul', 'wolf'] };
 
-const centerY = (e) => e.pos.y + (e.T.center ?? 1.1 * (e.T.scale || 1));
+// Sword rune effects on creatures (runes.js applies them): holy fire burns over time, frost slows and at three
+// stacks freezes solid, the dawn seal makes a creature burst in holy light when it dies.
+const ICE_MAT = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 1.05, 1.6) });
+const FROZEN_DMG = 1.5; // a frozen creature takes this much more damage
+const CHILL_SLOW = 0.15; // per frost stack
+const CHILL_TIME = 3; // stacks fade after this long without a new hit
+const BOSS_FREEZE = 0.35; // the Count shakes off frost faster
+
+export const centerY = (e) => e.pos.y + (e.T.center ?? 1.1 * (e.T.scale || 1));
+const undead = (e) => !!(e.burns ?? e.T.burns); // creatures the sun burns are weak to holy light
 
 const lerpAngle = (a, b, t) => {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -75,6 +87,7 @@ export class Enemies {
     this.onPerfectDodge = null;
     this.onBossPhase = null; // (boss, phase 2 | 3)
     this.shots = []; // the Count's blood orbs
+    this.blasts = []; // holy bursts of sealed creatures that died, set off on the next frame (chains read better)
     // set by the campaign: difficulty x chapter scaling, elite odds, XP per soul and how many creatures
     // may attack at once (the rest circle the hunter and wait their turn)
     this.mods = { hp: 1, dmg: 1, elite: 0, xp: 1, attackers: 3 };
@@ -127,7 +140,7 @@ export class Enemies {
     for (const o of this.orbs) this.scene.remove(o.mesh);
     for (const b of this.bolts) this.scene.remove(b.mesh);
     for (const s of this.shots) this.scene.remove(s.mesh);
-    this.list.length = this.orbs.length = this.bolts.length = this.shots.length = 0;
+    this.list.length = this.orbs.length = this.bolts.length = this.shots.length = this.blasts.length = 0;
     this.boss = null;
     this.spawnTimer = 3;
   }
@@ -155,6 +168,9 @@ export class Enemies {
       // special moves: cast (boss orbs, witch hex), prep (vampire lunge / bride scream windup), dash
       cast: 0, castCd: 2 + Math.random() * 2, prep: 0, prepKind: '', dash: null,
       lungeCd: 2 + Math.random() * 3, screamCd: 3 + Math.random() * 3,
+      // rune effects: holy fire (seconds left, damage per second, spreads on death), frost stacks / frozen solid,
+      // the dawn seal (seconds left, the burst it leaves behind)
+      fire: 0, fireDps: 0, fireSpread: false, chillN: 0, chillT: 0, frozen: 0, shatter: false, seal: 0, sealBlast: null, sealGlow: null,
     };
     // the eye glint, parented to the head (bats: the body) so it follows the animation
     e.glint = glowSprite(0xff3a1a, 1, 0.95);
@@ -220,6 +236,10 @@ export class Enemies {
       this.fx.burst(e.pos.clone().setY(centerY(e)), 0xc0a0ff, 6, { speed: 4, up: 2, life: 0.25, size: 0.08 });
       return;
     }
+    if (e.frozen > 0) {
+      dmg *= FROZEN_DMG;
+      this.fx.burst(e.pos.clone().setY(centerY(e)), 0xc8f4ff, 8, { speed: 5, up: 3, life: 0.4, size: 0.1 });
+    }
     e.hp -= dmg;
     if (e.T.boss) this.bossPhase(e);
     e.flash = 0.1;
@@ -227,6 +247,7 @@ export class Enemies {
     const k = e.T.boss ? knock * 0.25 : knock;
     e.kx = dirX * k;
     e.kz = dirZ * k;
+    hitReact(e, dirX, dirZ, knock > 8); // the body recoils away from the blow (creatureanim.js)
     e.atk = -1;
     e.crouch = 0; // a hit interrupts a werewolf about to pounce...
     if (!e.T.boss) { e.prep = 0; e.cast = 0; e.dash = null; } // ...a lunge, a scream or a hex
@@ -245,12 +266,85 @@ export class Enemies {
     this.fx.burst(p, e.T.blood, 30, { speed: 6, up: 6, life: 0.9 });
     this.fx.burst(p, 0x200818, 16, { speed: 3, up: 2, gravity: 2, life: 1.2, size: 0.25 });
     for (let i = 0; i < e.souls; i++) this.dropOrb(e.pos.x + (Math.random() - 0.5) * 2, e.pos.z + (Math.random() - 0.5) * 2);
+    if (e.sealGlow) e.sealGlow.visible = false;
+    // rune effects that outlive the creature
+    if (e.seal > 0 && e.sealBlast) this.blasts.push({ x: e.pos.x, z: e.pos.z, y: centerY(e), from: e, ...e.sealBlast });
+    if (e.fire > 0 && e.fireSpread)
+      for (const o of this.near(e.pos, 3.5, e)) this.ignite(o, e.fireDps, 3, true);
+    if (e.frozen > 0 && e.shatter) {
+      this.fx.burst(p, 0xc8f4ff, 26, { speed: 9, up: 3, life: 0.5, size: 0.14 });
+      for (const o of this.near(e.pos, 4, e)) this.chill(o, 2, 1.4);
+    }
     if (e === this.boss) this.boss = null;
     this.onKill?.(e);
   }
 
-  // Sword arc test from the player's position and facing.
-  hitArc(player, def) {
+  // living creatures within r of a point (r measured to their edge)
+  near(p, r, except = null) {
+    const out = [];
+    for (const o of this.list) if (o !== except && !o.dying && Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < r + o.T.radius) out.push(o);
+    return out;
+  }
+
+  // --- sword rune effects (called by runes.js)
+  // holy fire: burns `dps` for `dur` seconds; with `spread` it jumps to the creatures around when this one falls
+  ignite(e, dps, dur, spread = false) {
+    if (e.dying) return;
+    e.fireDps = e.fire > 0 ? Math.max(e.fireDps, dps) : dps;
+    e.fire = Math.max(e.fire, dur);
+    e.fireSpread ||= spread;
+  }
+
+  // frost: each stack slows the creature; the third freezes it solid for `freezeDur`
+  chill(e, n, freezeDur, shatter = false) {
+    if (e.dying || e.frozen > 0) return;
+    e.chillN = Math.min(3, e.chillN + n);
+    e.chillT = CHILL_TIME;
+    if (e.chillN >= 3) this.freeze(e, freezeDur, shatter);
+  }
+
+  // frozen solid: no moving, no striking, and blows hit harder; with `shatter` it bursts into frost when it dies
+  freeze(e, dur, shatter = false) {
+    if (e.dying) return;
+    e.frozen = Math.max(e.frozen, e.T.boss ? dur * BOSS_FREEZE : dur);
+    e.chillN = e.chillT = 0;
+    e.shatter ||= shatter;
+    this.interrupt(e);
+    this.fx.burst(e.pos.clone().setY(centerY(e)), 0xc8f4ff, 16, { speed: 4, up: 3, life: 0.5, size: 0.12 });
+    sfx.freeze(e.pos);
+  }
+
+  // stunned or blinded for t seconds (the Count only flinches)
+  daze(e, t) {
+    if (e.dying) return;
+    e.stun = Math.max(e.stun, e.T.boss ? Math.min(t, 0.15) : t);
+    if (!e.T.boss) this.interrupt(e);
+  }
+
+  // the dawn seal: when the creature dies within `dur` seconds it bursts in holy light (blast: { dmg, r, chain })
+  seal(e, dur, blast) {
+    if (e.dying) return;
+    e.seal = Math.max(e.seal, dur);
+    e.sealBlast = blast;
+    if (!e.sealGlow) {
+      e.sealGlow = glowSprite(0xffe080, 1.5, 0.55);
+      e.sealGlow.position.y = (e.T.center ?? 1.1 * (e.T.scale || 1)) / e.m.root.scale.y;
+      e.m.root.add(e.sealGlow);
+    }
+    e.sealGlow.visible = true;
+  }
+
+  // cancels whatever blow, pounce, lunge, scream or spell the creature was winding up
+  interrupt(e) {
+    e.atk = -1;
+    e.crouch = 0;
+    e.second = false;
+    if (e.leap) { e.leap = null; e.leapY = 0; }
+    if (!e.T.boss) { e.prep = 0; e.cast = 0; e.dash = null; }
+  }
+
+  // Sword arc test from the player's position and facing; `each` is told about every creature struck.
+  hitArc(player, def, each) {
     const fx = Math.sin(player.facing), fz = Math.cos(player.facing);
     let n = 0;
     for (const e of this.list) {
@@ -260,6 +354,7 @@ export class Enemies {
       if (d > 1.2 && (dx * fx + dz * fz) / d < def.arc) continue;
       if (Math.abs(centerY(e) - player.pos.y - 1) > 2.6) continue;
       this.damage(e, def.dmg, dx / d, dz / d, def.vertical ? 10 : 7);
+      each?.(e);
       n++;
     }
     return n;
@@ -395,6 +490,20 @@ export class Enemies {
         }
       }
 
+    // sealed creatures that died last frame burst in holy light; with `chain` the burst seals whoever it hits,
+    // so a crowd can go up one after another
+    for (const b of this.blasts.splice(0)) {
+      const at = new THREE.Vector3(b.x, b.y, b.z);
+      this.fx.ring(at.clone().setY(b.y - 1), 0xffe080, b.r, 0.4);
+      this.fx.burst(at, 0xfff0b0, 24, { speed: 7, up: 4, gravity: -2, life: 0.5, size: 0.14 });
+      sfx.holy(at);
+      for (const o of this.near(at, b.r, b.from)) {
+        const dx = o.pos.x - b.x, dz = o.pos.z - b.z, d = Math.hypot(dx, dz) || 1;
+        if (b.chain) this.seal(o, 4, b);
+        this.damage(o, b.dmg * (undead(o) ? 1.5 : 1), dx / d, dz / d, 9);
+      }
+    }
+
     // attack tokens: only a few creatures (bosses aside) wind up a strike or a pounce at the same time
     this.attackers = 0;
     for (const e of L) if (!e.dying && !e.T.boss && (e.atk >= 0 || e.leap || e.crouch > 0 || e.cast > 0 || e.prep > 0 || e.dash)) this.attackers++;
@@ -500,11 +609,10 @@ export class Enemies {
     if (e.dying) {
       e.glint.visible = false;
       e.dying += dt;
-      const k = Math.min(1, e.dying * 3);
-      if (T.fly) { pos.y = Math.max(groundAt(pos.x, pos.z), pos.y - dt * 8); m.spin.rotation.z += dt * 10; }
-      else m.spin.rotation.x = -k * Math.PI / 2;
-      if (e.dying > 0.6) pos.y -= dt * 1.5;
+      if (T.fly) pos.y = Math.max(groundAt(pos.x, pos.z), pos.y - dt * 8);
+      if (e.dying > 0.9) pos.y -= dt * 1.5; // lies on the ground a moment, then sinks into it
       m.root.position.copy(pos);
+      animateCreature(e, dt, time, ANIM);
       for (const mesh of m.meshes) mesh.material = e.dying < 0.12 ? FLASH_MAT : mesh.userData.orig;
       return e.dying > 1.4;
     }
@@ -513,6 +621,28 @@ export class Enemies {
     // stragglers despawn, but the Count and named guardians hunt the player down instead of vanishing
     if (dist > 120 && !T.boss && !e.name) return true;
     const ground = groundAt(pos.x, pos.z);
+
+    // rune effects: holy fire eats away at the creature, frost fades, the seal runs out, the ice thaws
+    if (e.fire > 0) {
+      e.fire -= dt;
+      if (!(e.shield > 0)) {
+        e.hp -= e.fireDps * dt;
+        if (T.boss) this.bossPhase(e);
+      }
+      if (Math.random() < 0.7) this.fx.burst(pos.clone().setY(pos.y + 0.4 + Math.random() * 1.2 * sc), Math.random() < 0.5 ? 0xff6a1a : 0xffd040, 1, { speed: 0.8, up: 3.5, gravity: 2, life: 0.5, size: 0.12 });
+      if (e.hp <= 0) { this.kill(e); return false; }
+      if (e.fire <= 0) Object.assign(e, { fire: 0, fireDps: 0, fireSpread: false });
+    }
+    if (e.chillT > 0 && (e.chillT -= dt) <= 0) e.chillN = 0;
+    if (e.chillN > 0 && Math.random() < 0.12 * e.chillN) this.fx.burst(pos.clone().setY(pos.y + 0.3 + Math.random() * sc), 0xb0ecff, 1, { speed: 0.4, up: -0.5, gravity: -1, life: 0.6, size: 0.08 });
+    if (e.seal > 0 && (e.seal -= dt) <= 0) { e.seal = 0; if (e.sealGlow) e.sealGlow.visible = false; }
+    if (e.frozen > 0 && (e.frozen -= dt) <= 0) {
+      e.frozen = 0;
+      e.shatter = false;
+      this.fx.burst(pos.clone().setY(centerY(e)), 0xc8f4ff, 10, { speed: 3, up: 1, life: 0.4, size: 0.1 });
+    }
+    // frost slows everything the creature does
+    if (e.chillN > 0) dt *= 1 - CHILL_SLOW * e.chillN;
 
     // sunlight burns the undead
     if ((e.burns ?? T.burns) && dayAmt > 0.55) {
@@ -527,12 +657,15 @@ export class Enemies {
     const free = T.boss || this.attackers < this.mods.attackers;
     const W = e.windup || T.windup; // the Count's fury shortens his windup
     let speed = 0;
+    let waiting = false; // circling the hunter until an attack turn frees up
     let mx = 0, mz = 0;
     e.pathing = false; // walking around an obstacle this frame (set in the chase below)
     if (e.shield > 0) {
       // changing phase: a column of mist, untouchable
       e.shield -= dt;
       if (Math.random() < 0.7) this.fx.burst(pos.clone().setY(pos.y + 0.5 + Math.random() * 2), Math.random() < 0.6 ? 0x8a2ad0 : 0xff1030, 3, { speed: 2, up: 3, gravity: 0, life: 0.7, size: 0.22 });
+    } else if (e.frozen > 0) {
+      // frozen solid (the timer runs above): it only slides where the blows push it
     } else if (e.stun > 0) {
       e.stun -= dt;
     } else if (e.cast > 0) {
@@ -659,6 +792,7 @@ export class Enemies {
       }
       // no free slot and already close: circle the hunter at the edge of the fight and wait for a turn
       const wait = !free && !player.dead && !e.pathing && !T.ranged && dist < T.range + (T.fly ? 6 : 3.4) * sc;
+      waiting = wait;
       if (T.fly && dist > 7 && !wait) {
         // circle around the player before swooping in
         const side = Math.sin(time * 0.8 + e.phase) > 0 ? 1 : -1;
@@ -726,59 +860,29 @@ export class Enemies {
     const g = groundAt(pos.x, pos.z);
     if (T.fly) {
       const swoop = e.atk >= 0 || (dist < 7 && e.cd <= 0.2 && free);
-      const ty = swoop ? player.pos.y + 1.1 - (T.center || 0) : Math.max(g, WATER) + T.fly + Math.sin(time * 2 + e.phase) * 0.5;
+      // a frozen flyer sinks toward the ground
+      const ty = e.frozen > 0 ? Math.max(g, WATER) + 0.6
+        : swoop ? player.pos.y + 1.1 - (T.center || 0) : Math.max(g, WATER) + T.fly + Math.sin(time * 2 + e.phase) * 0.5;
       pos.y += (ty - pos.y) * Math.min(1, dt * 4);
     } else pos.y = g + (e.leapY || 0);
+
+    if (e.frozen > 0) {
+      // frozen: the pose holds still under the ice, only knockback still moves it
+      e.glint.visible = false;
+      m.root.position.copy(pos);
+      if (e.flash > 0) e.flash -= dt;
+      e.tell = 0;
+      for (const mesh of m.meshes) mesh.material = e.flash > 0 ? FLASH_MAT : ICE_MAT;
+      return false;
+    }
 
     // --- animation (walking around an obstacle: face the way it walks, not the hunter through the wall)
     const target = e.pathing ? Math.atan2(mx, mz) : Math.atan2(dx, dz);
     e.facing = lerpAngle(e.facing, target, 1 - Math.exp(-10 * dt));
-    e.phase += (speed + 1) * dt * 1.6;
-    const sw = Math.sin(e.phase) * Math.min(1, speed / 4);
-    const amt = Math.min(1, speed / 4);
-    if (m.legL) {
-      m.legL.rotation.x = sw * 0.8;
-      m.legR.rotation.x = -sw * 0.8;
-      m.shinL.rotation.x = 0.08 + Math.max(0, Math.sin(e.phase - 1.2)) * amt;
-      m.shinR.rotation.x = 0.08 + Math.max(0, Math.sin(e.phase - 1.2 + Math.PI)) * amt;
-    }
-    // hunched predators, upright aristocrats
-    if (m.spine) m.spine.rotation.x = e.type === 'ghoul' ? 0.5 : e.type === 'wolf' ? 0.35 + amt * 0.15 : 0.05;
-    if (m.neck) m.neck.rotation.x = e.type === 'ghoul' || e.type === 'wolf' ? -0.35 : 0;
-    if (m.foreL) {
-      const bend = e.atk >= 0 ? (e.atk < W ? -0.9 : -0.1) : e.type === 'bride' ? -0.6 : -0.35;
-      m.foreL.rotation.x = m.foreR.rotation.x = bend;
-    }
-    if (m.armL) {
-      let ax;
-      if (e.cast > 0) ax = -2.4; // arms raised to throw the blood orbs
-      else if (e.atk >= 0) ax = e.atk < W ? -0.5 - (e.atk / W) * 2.2 : -1.1;
-      else if (e.type === 'ghoul' || e.type === 'wolf') ax = -1.1 + sw * 0.3;
-      else if (e.type === 'bride') ax = -0.4 + Math.sin(time * 3 + e.phase) * 0.2;
-      else ax = sw * 0.5;
-      m.armL.rotation.x = ax + (e.type === 'ghoul' ? sw * 0.2 : 0);
-      m.armR.rotation.x = ax - (e.type === 'ghoul' ? sw * 0.2 : 0);
-    }
-    if (m.wingL) {
-      const rate = e.type === 'bat' ? 22 : 9;
-      const f = Math.sin(time * rate + e.phase) * (e.type === 'bat' ? 0.9 : 0.5);
-      m.wingL.rotation.z = f + (e.type === 'bride' ? 0.2 : 0);
-      m.wingR.rotation.z = -f - (e.type === 'bride' ? 0.2 : 0);
-    }
-    if (m.cape) m.cape.rotation.x = 0.15 + speed * 0.06 + Math.sin(time * 6 + e.phase) * 0.05;
-    if (m.cape2) m.cape2.rotation.x = 0.1 + speed * 0.05 + Math.sin(time * 5 + e.phase + 1) * 0.08;
-    if (m.wingL2) {
-      const f2 = Math.sin(time * (e.type === 'bat' ? 22 : 9) + e.phase - 0.6) * 0.5;
-      m.wingL2.rotation.z = f2;
-      m.wingR2.rotation.z = -f2;
-    }
-    if (m.tail) m.tail.rotation.y = Math.sin(time * 8 + e.phase) * 0.4;
-    if (m.tail2) m.tail2.rotation.y = Math.sin(time * 8 + e.phase - 0.8) * 0.5;
-    if (e.leap) m.spin.rotation.x = -0.6;
-    else if (e.crouch > 0 || (e.prep > 0 && e.prepKind === 'lunge')) m.spin.rotation.x = 0.4; // coiled
-    else if (e.dash) m.spin.rotation.x = 0.55; // low, fast lunge
-    else if (e.prep > 0) m.spin.rotation.x = -0.35; // bride throws her head back to scream
-    else m.spin.rotation.x = e.type === 'bride' ? 0.35 : 0;
+    m.root.rotation.y = e.facing;
+    ANIM.wait = waiting;
+    ANIM.W = W;
+    animateCreature(e, dt, time, ANIM);
 
     // telegraph: a red flash as the windup starts, then the eye glint swells until the blow lands
     const winding = (e.atk >= 0 && e.atk < W) || e.crouch > 0 || e.cast > 0 || e.prep > 0;

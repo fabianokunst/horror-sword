@@ -71,6 +71,15 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="6.5" /><path d="M12 2v5M12 17v5M2 12h5M17 12h5" /></svg>
           <small>ALVO</small>
         </div>
+        <!-- outer ring: sword runes (runes.js). ARTE glows when the Fúria bar is full; RUNA shows the rune in the blade -->
+        <div class="tb off" id="tbArt" data-key="KeyV" style="--dx: -0.453; --dy: -1.69" aria-label="Arte da lâmina">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" /></svg>
+          <small>ARTE</small>
+        </div>
+        <div class="tb off" id="tbRune" data-key="KeyX" style="--dx: -1.69; --dy: -0.453" aria-label="Trocar runa">
+          <b class="rn-tg">†</b>
+          <small>RUNA</small>
+        </div>
       </div>
     </div>
 
@@ -86,11 +95,13 @@
       <div class="controls desk-only">
         <span>WASD</span> mover &nbsp; <span>Mouse</span> câmera &nbsp; <span>Shift</span> correr &nbsp; <span>Espaço</span> pular<br />
         <span>Clique Esq.</span> espada (combo x3) &nbsp; <span>Clique Dir. / Ctrl</span> esquiva &nbsp; <span>Q / F</span> besta de prata &nbsp; <span>R</span> travar alvo<br />
+        <span>V</span> Arte da lâmina (Fúria cheia) &nbsp; <span>1-6 / X / roda</span> trocar runa<br />
         Vampiros queimam ao amanhecer · Olhos vermelhos: esquive no último instante e contra-ataque &nbsp; <span>Esc</span> pausa &nbsp; <span>M</span> som
       </div>
       <div class="controls touch-only">
         <span>Lado esquerdo</span> mover &nbsp; <span>Lado direito</span> arrastar a câmera<br />
         <span>Espada</span> segure para o combo &nbsp; <span>Esquiva</span> <span>Besta</span> <span>Pulo</span> <span>Correr</span> <span>Alvo</span><br />
+        <span>Arte</span> com a Fúria cheia &nbsp; <span>Runa</span> troca o poder da lâmina<br />
         Vampiros queimam ao amanhecer · Olhos vermelhos: esquive no último instante e contra-ataque
       </div>
       </div>

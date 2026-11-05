@@ -20,7 +20,7 @@ O jogo precisa do build: abrir o `index.html` da raiz direto (ou servir a raiz d
 npm test         # ~30 s: monta uma cópia de desenvolvimento, joga no Chrome sem janela e confere o básico
 ```
 
-[`tests/smoke.mjs`](tests/smoke.mjs) gera um build de desenvolvimento numa pasta temporária (mantém o gancho `window.__hs`), serve numa porta livre e joga no Chrome instalado (variável `CHROME_PATH` para escolher outro). Falha se houver qualquer erro na página ou se quebrar: início da caçada, vez de atacar, aviso de golpe, esquiva perfeita e contra-ataque, trava de alvo, colisão da câmera, criaturas contornando uma casa e o layout dos botões de toque. Como usa pasta e porta próprias, várias sessões podem rodar ao mesmo tempo.
+[`tests/smoke.mjs`](tests/smoke.mjs) gera um build de desenvolvimento numa pasta temporária (mantém o gancho `window.__hs`), serve numa porta livre e joga no Chrome instalado (variável `CHROME_PATH` para escolher outro). Falha se houver qualquer erro na página ou se quebrar: início da caçada, vez de atacar, aviso de golpe, esquiva perfeita e contra-ataque, runas (efeitos dos golpes e Arte), trilha da espada e criaturas mortas caídas no chão, trava de alvo, colisão da câmera, criaturas contornando uma casa e o layout dos botões de toque. Como usa pasta e porta próprias, várias sessões podem rodar ao mesmo tempo. As páginas do teste ignoram controles de verdade ligados ao computador (o Chrome sem janela também os enxerga e um botão apertado iniciaria a caçada sozinho); o teste do controle usa um controle simulado.
 
 ### Publicar (GitHub Pages)
 
@@ -37,7 +37,10 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Clique direito / Ctrl / C | esquiva com invencibilidade |
 | Q / F / botão do meio | besta de prata (6 virotes, recarregam sozinhos) |
 | R | travar alvo (câmera, espada e besta miram a criatura; um movimento rápido do mouse para o lado troca de alvo) |
+| V | **Arte** da lâmina, com a barra de Fúria cheia (veja Runas e Fúria) |
+| 1–6 / X / roda do mouse | escolher / trocar a **runa** da espada |
 | Tab / I | inventário (no celular: botão ITENS) |
+| Mouse nas telas de escolha | no inventário, nas cartas de dom e no mercador aparece um ponteiro em forma de espada: aponte (ele fica dourado sobre o que dá para clicar) e clique; botão direito volta |
 | E | pegar item brilhando no chão · rezar no santuário · falar com o mercador |
 | M | liga/desliga o som (também há o botão SOM no menu) |
 | Esc | pausa |
@@ -50,7 +53,9 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | A (✕) | pular · nos menus: confirmar / CAÇAR / CONTINUAR |
 | B (◯) | esquiva · nos menus: voltar |
 | X (▢) / RB | espada (segure para o combo) |
-| Y (△) / RT | besta |
+| Y (△) | besta |
+| RT | Arte da lâmina (Fúria cheia) |
+| Direcional ◀ ▶ | trocar a runa da espada |
 | LB / R3 | travar alvo |
 | LT / L3 | correr (segurando) |
 | Direcional ↑ | pegar item · no inventário e nas cartas de dom: mover o cursor |
@@ -70,6 +75,8 @@ Funciona de celulares pequenos (iPhone SE) a monitores ultrawide, em paisagem ou
 | Botão da espada | golpe; segure para o combo completo |
 | ESQUIVA / BESTA / PULO | como no teclado (o número na besta é a munição) |
 | ALVO | trava/solta o alvo (aceso enquanto travado); deslizar rápido no lado direito troca de alvo |
+| ARTE | Arte da lâmina (o botão acende quando a Fúria enche) |
+| RUNA | troca a runa da espada (mostra o símbolo da runa na lâmina) |
 | CORRER | liga a corrida; desliga ao soltar o analógico |
 | ITENS / ❚❚ | inventário / pausa |
 | Toque no aviso do item | pegar item |
@@ -87,6 +94,18 @@ Ao tocar em CAÇAR o jogo entra em tela cheia (no Android também trava em paisa
 - **O Conde em três fases** (marcadas na barra de vida): **I** golpes e teleporte em névoa com morcegos; **II** (abaixo de 66%) ele vira névoa por um instante (intocável), chama morcegos e passa a lançar leques de 3 orbes de sangue quando você se afasta — com o mesmo brilho nos olhos antes, e também dá para fazer esquiva perfeita neles; **III** (abaixo de 33%) fúria: aura vermelha, mais rápido, golpe duplo, teleporta mais e lança 5 orbes. Um golpe enorme não pula fases.
 - **Caminhos:** criaturas a pé que não enxergam o caçador (uma casa, um muro, a cerca do cemitério no caminho) dão a volta pelo obstáculo em vez de empacar nele. O lobisomem só salta com o caminho livre, e o vampiro reaparece em chão aberto atrás de você ou, com uma parede às suas costas, pelos lados. Morcegos e noivas voam por cima de tudo.
 - **Travar alvo:** R (ALVO no toque) trava a criatura para onde a câmera aponta ou a mais próxima. A câmera acompanha, o caçador fica de frente para ela ao andar (correr quebra) e espada e besta miram nela. Quando ela morre, a trava passa para a criatura mais próxima; longe demais (34 m), solta.
+- **Runas e Fúria:** a espada recebe **runas** que mudam a cor da lâmina, o efeito de cada golpe e o golpe especial. Cada capítulo concluído revela uma (a nova já entra na lâmina); troque com 1–6, X ou a roda do mouse (◀ ▶ no controle, RUNA no toque). A linha da runa fica sob as barras de vida e stamina: símbolo, nome e nível, as runas encontradas e a **barra de Fúria**.
+
+  | Runa | Capítulo | Cada golpe | Arte (V / RT / ARTE) | Maestria III |
+  |---|---|---|---|---|
+  | † Aço | início | — | **Lâmina Giratória**: giro que corta tudo em volta | — |
+  | ✹ Brasa | I | incendeia (dano contínuo; feras queimam 50% mais) | **Círculo de Brasas**: onda de fogo em volta | o fogo pula para as vizinhas quando uma cai queimando |
+  | ❦ Sangria | II | cura o caçador; cada criatura abatida cura mais | **Lua Crescente**: lâmina de sangue que voa à frente, atravessa a fila e cura a cada criatura | abates curam o dobro |
+  | ↯ Tempestade | III | o 3º golpe do combo e o contra-ataque soltam um raio que pula entre as criaturas | **Juízo dos Céus**: raios caem sobre as criaturas em volta e as atordoam | os raios em corrente atordoam |
+  | ❄ Geada | IV | gela e deixa lenta; no 3º acerto congela (sem se mexer, +50% de dano recebido; o Conde só por um instante) | **Inverno Eterno**: sopro gelado que congela tudo à frente | congeladas estilhaçam ao cair e gelam as vizinhas |
+  | ☼ Aurora | V | marca um selo de luz: a criatura explode ao cair (mortos-vivos sofrem 50% mais) | **Amanhecer**: clarão que cega tudo em volta, sela e queima os mortos-vivos | as explosões selam quem atingem (reação em cadeia) |
+
+  A **Fúria** enche com golpes de espada (até 3 criaturas por golpe; contra-ataques valem mais), abates e esquivas perfeitas. Cheia, a barra pulsa e a Arte da runa na lâmina fica pronta: durante ela o caçador não leva dano, e a Arte também quebra caixões. Os abates feitos com uma runa na lâmina dão **maestria** a ela (II com 25 abates, III com 70; elites contam 3, chefes 10), e cada nível fortalece o efeito e a Arte. O nível máximo é III no primeiro ciclo; cada ciclo de novo jogo+ desperta mais um (IV, depois V, com 140 e 240 abates). O **Incenso de Ira** (mercador, pelo vale ou caído de criaturas) enche a Fúria na hora.
 
 ## Campanha
 
@@ -112,22 +131,26 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 | Van Helsing | +40% vida, +35% dano, mais criaturas e elites, +25% XP | igual ao Caçador |
 | Pesadelo | +80% vida, +70% dano, +50% XP | o save é apagado (fica só o recorde) |
 
-**Evolução:** almas dão experiência; cada nível dá +4 de vida, +2% de dano e a escolha de 1 entre 3 **dons** (vigor, couraça, fôlego, lâmina rúnica, alcance, golpe de misericórdia, sede de sangue, colheita de almas, aljava, prata benta, mãos ágeis, virote perfurante, passo fantasma, pés ligeiros; cada um com vários níveis). Concluir um capítulo dá meio nível de bônus. Os títulos mudam a cor da lâmina, da lanterna e dos golpes: Aprendiz (ciano) → Juramentado (nv 5, ouro) → Matador de Vampiros (10, carmesim) → Inquisidor (15, violeta) → Lenda da Noite (22, prata). No level-up o jogo pausa: toque/clique na carta, teclas 1-2-3 ou mova o mouse e clique.
+**Evolução:** almas dão experiência; cada nível dá +4 de vida, +2% de dano e a escolha de 1 entre 3 **dons** (vigor, couraça, fôlego, lâmina rúnica, alcance, golpe de misericórdia, sede de sangue, colheita de almas, aljava, prata benta, mãos ágeis, virote perfurante, passo fantasma, pés ligeiros, ira santa (Fúria enche mais rápido), ressonância (efeitos das runas mais fortes), mestre de armas (Artes mais fortes); cada um com vários níveis). Concluir um capítulo dá meio nível de bônus. Os títulos mudam a cor da lâmina, da lanterna e dos golpes: Aprendiz (ciano) → Juramentado (nv 5, ouro) → Matador de Vampiros (10, carmesim) → Inquisidor (15, violeta) → Lenda da Noite (22, prata). No level-up o jogo pausa: toque/clique na carta, teclas 1-2-3 ou mova o mouse e clique.
 
-**Santuários e mercador:** os 8 santuários de beira de estrada (✝ dourado no minimapa) são pontos de descanso: **E** (toque no aviso, ou ↑ no controle) para rezar — vida, stamina e virotes cheios e o progresso é salvo ali, então ao cair você volta ao último santuário. Cada santuário atende uma vez por noite (a luz fica fraca depois). As almas (✦ no HUD) são também moeda: o **mercador** na praça de Borgo (¤ no minimapa) vende Erva Verde (8), Erva Vermelha (10), Água Benta (18) e Ervas Mistas V+R (30). O jogo pausa enquanto a loja está aberta (1-4 / ← → Enter / toque / controle).
+**Santuários e mercador:** os 8 santuários de beira de estrada (✝ dourado no minimapa) são pontos de descanso: **E** (toque no aviso, ou ↑ no controle) para rezar — vida, stamina e virotes cheios e o progresso é salvo ali, então ao cair você volta ao último santuário. Cada santuário atende uma vez por noite (a luz fica fraca depois). As almas (✦ no HUD) são também moeda: o **mercador** na praça de Borgo (¤ no minimapa) vende Erva Verde (8), Erva Vermelha (10), Água Benta (18), Ervas Mistas V+R (30) e Incenso de Ira (25, enche a Fúria). O jogo pausa enquanto a loja está aberta (1-5 / ← → Enter / toque / controle).
 
-**Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo e ao rezar num santuário (posição, hora do dia, nível, dons, inventário, almas). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
+**Save:** fica no `localStorage` do navegador (`horror-sword:save`, recordes em `horror-sword:records`). O checkpoint é gravado ao começar e ao concluir cada capítulo e ao rezar num santuário (posição, hora do dia, nível, dons, inventário, almas, runas e maestria). No menu aparece CONTINUAR com o resumo do save, ou "Nova caçada" para escolher outra dificuldade.
 
 ## Estrutura
 
-- `src/ps1.js` — pipeline retrô: baixa resolução com pixels inteiros, vertex snapping, texturas afins/reduzidas, paletas com dithering (Bayer 2×2/4×4/8×8 ou ruído) e filtro de monitor CRT; materiais e texturas procedurais.
-- `src/settings.js` — painel de configurações (botão no menu/pausa): predefinições e ajuste ao vivo de resolução, cores, texturas, dithering e CRT, mais sensibilidade da câmera, eixo invertido, vibração e volumes de música/efeitos/ambiente, salvo no `localStorage`.
+- `src/ps1.js` — pipeline retrô: baixa resolução com pixels inteiros, vertex snapping, texturas afins/reduzidas, paletas com dithering (Bayer 2×2/4×4/8×8 ou ruído), filtro de monitor CRT e o acabamento liso (sombreamento suave, texturas filtradas, antisserrilhado e sombras suaves, usado pela predefinição "3D limpo"); materiais e texturas procedurais.
+- `src/settings.js` — painel de configurações (botão no menu/pausa): predefinições (TV de tubo, PS1 puro, Monitor arcade, Pixel sombrio, Daguerreótipo, Nítido e 3D limpo) e ajuste ao vivo de resolução, cores, acabamento, texturas, dithering e CRT, mais sensibilidade da câmera, eixo invertido, vibração e volumes de música/efeitos/ambiente, salvo no `localStorage`.
 - `src/world.js` — vale desenhado à mão e fechado por montanhas: relevo projetado (rio, lago, colinas, monte do castelo), terreno pintado, estradas, florestas, minimapa pré-renderizado, colisão em grade, ponte caminhável (`groundAt`), caixões/portão/arena e pool de luzes pontuais.
 - `src/structures.js` — construções únicas: Vilarejo de Borgo (casas enxaimel, igreja, poço, feira), Cemitério dos Esquecidos (mausoléu, anjo), Moinho Queimado (pás girando), Abadia de São Miguel (rosácea), Colina da Forca, Ponte do Rio Argeș, santuários e o Castelo Drácula.
-- `src/characters.js` — personagens com malha contínua e esqueleto (`SkinnedMesh`): tubos e elipsoides suaves fundidos numa malha só, pesos de skinning calculados por distância aos ossos; acessórios rígidos (espada, chapéu, coroa, besta) presos aos ossos.
+- `src/characters.js` — personagens com malha contínua e esqueleto (`SkinnedMesh`): tubos e elipsoides suaves fundidos numa malha só, pesos de skinning calculados por distância aos ossos; acessórios rígidos (espada, chapéu, coroa, besta nas costas e na mão) presos aos ossos; a aba do casaco do caçador tem osso próprio para esvoaçar.
+- `src/anim.js` — ferramentas de animação procedural: `Poser` (cada quadro a animação escreve a pose inteira; trocar de ação faz uma transição suave a partir da pose na tela, e o corpo pode inclinar em torno de qualquer ponto, como os pés ou o meio do corpo), quadros-chave (`clip`/`sample`, com espelhamento esquerda/direita), molas para movimento secundário e recuos, passada e pés nivelados com o chão.
+- `src/hunteranim.js` — animação do caçador: passada que segue a direção real (de lado e de costas com o alvo travado), quadril e ombros torcendo, inclinação na velocidade, na aceleração e nas curvas, espada arrastando baixa na corrida; guarda de esgrima que respira e, parado alguns segundos, gira a espada e a apoia no ombro; combo com preparo, golpe, acompanhamento e um passo à frente em cada golpe; Artes (giro com o braço estendido, salto com cambalhota e golpe no chão), rolamento encolhido no chão, pulo/queda/aterrissagem, saque rápido da besta, recuo ao levar golpe, mãos nos ouvidos no grito da noiva, nado e morte (cambaleia, cai de joelhos e tomba de cara no chão); casaco e cachecol em molas; pontas da lâmina para a trilha do golpe.
+- `src/creatureanim.js` — animação das criaturas, cada uma com seu jeito: carniçal mancando, cabeça tombando e com tiques, golpe com os dois braços; vampiro deslizando com as garras prontas, golpe alternando os braços, agachamento antes da investida e voo rasante; lobisomem de quatro (passo que vira galope), rondando baixo enquanto espera, empinando para o golpe duplo, tremendo antes do salto, esticado no ar e amassando ao cair; noiva flutuando com o vestido ondulando e asas batendo de verdade, cabeça jogada para trás para gritar; bruxa curvada no cajado, erguendo a lanterna para lançar; morcego com batida assimétrica, inclinando nas curvas e fechando as asas no mergulho; o Conde ergue os braços para lançar e cruza-os ao mudar de fase. Todas recuam ao levar golpe, e as que andam tombam no chão ao morrer.
 - `src/models.js` — primitivas (caixa, cilindro, frontão) e `bake()` para construções e acessórios.
-- `src/player.js` — movimento, combo, esquiva, besta; atributos vindos dos dons (`applyStats`) e cor do título (`setRank`).
-- `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes.
+- `src/player.js` — movimento, combo, esquiva, besta, tempo das Artes (`startArt`); atributos vindos dos dons (`applyStats`), cor do título (`setRank`) e da runa (`setRuneColor`).
+- `src/runes.js`, `src/runes.css` — runas da espada: catálogo, efeito de cada golpe, barra de Fúria, Artes (anel de fogo, lâmina de sangue, raios, sopro gelado, clarão), maestria por abates (gravada no save) e a linha da runa no HUD.
+- `src/enemies.js` — IA (teleporte em névoa, salto do lobisomem, rasante das noivas), aviso visual dos golpes, vez de atacar, detecção da esquiva perfeita e câmera lenta das criaturas, spawns definidos pelo capítulo, escala de dificuldade, elites e guardiões nomeados, almas, virotes; efeitos das runas nas criaturas (fogo, lentidão e congelamento, selo de luz que explode ao cair).
 - `src/interact.js`, `src/interact.css` — santuários (rezar: cura, recarga e checkpoint, uma vez por noite) e o mercador de Borgo (loja com almas, aviso na tela tocável).
 - `src/nav.js` — navegação das criaturas a pé: grade de 1 m numa janela de 112 m em volta do caçador, desenhada a partir dos círculos de colisão do mundo (refeita a cada 2 m andados ou 1 s), teste de linha de visão e campo de fluxo (Dijkstra em 8 direções) calculado só quando alguma criatura perde o caçador de vista.
 - `src/lockon.js` — trava de alvo: escolha e troca de alvo, marcador sobre a criatura, ângulo da câmera.
@@ -139,7 +162,7 @@ Só o caixão do capítulo atual pode ser quebrado. A cada capítulo as criatura
 - `src/gamepad.js` — controles de videogame (mapeamento padrão): botões viram as mesmas teclas virtuais do teclado, conforme o contexto (jogo, inventário/dons, menus).
 - `src/touch.js` — controles de toque (analógico, câmera, botões); viram teclas virtuais no `Input`, então o loop do jogo não distingue toque de teclado.
 - `src/audio.js` — todo o som é sintetizado em tempo real (veja abaixo).
-- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, HUD/minimapa, entrada e loop/ciclo dia-noite (a ondulação da água roda no shader de vértice). O build separa o three.js (`assets/three-*.js`) do código do jogo, então uma atualização só baixa de novo a parte que mudou.
+- `src/effects.js`, `src/hud.js`, `src/input.js`, `src/main.js` — partículas, trilha da lâmina (fita suavizada que acompanha a espada em cada golpe, na cor da runa ou do título), ondas de choque e raios, HUD/minimapa, entrada e loop/ciclo dia-noite (a ondulação da água roda no shader de vértice). O build separa o three.js (`assets/three-*.js`) do código do jogo, então uma atualização só baixa de novo a parte que mudou.
 
 ## Som
 

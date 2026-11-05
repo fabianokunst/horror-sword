@@ -5,29 +5,46 @@ import { L } from './i18n.js';
 const KEY = 'horror-sword:video'; // (name kept so earlier saved video settings still load)
 
 const PRESETS = [
-  { id: 'tv', name: L('TV de tubo', 'CRT TV'), lines: 180, palette: 'rgb12', bright: 100, vignette: 50, texRes: 1, affine: 70, wobble: 1,
+  { id: 'tv', name: L('TV de tubo', 'CRT TV'), lines: 180, palette: 'rgb12', bright: 100, vignette: 50, smooth: false, texRes: 1, affine: 70, wobble: 1,
     dither: 'bayer4', ditherAmt: 100, crt: true, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'ps1', name: L('PS1 puro', 'Pure PS1'), lines: 240, palette: 'rgb15', bright: 100, vignette: 45, texRes: 1, affine: 100, wobble: 1,
+  { id: 'ps1', name: L('PS1 puro', 'Pure PS1'), lines: 240, palette: 'rgb15', bright: 100, vignette: 45, smooth: false, texRes: 1, affine: 100, wobble: 1,
     dither: 'bayer4', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'arcade', name: L('Monitor arcade', 'Arcade monitor'), lines: 240, palette: 'rgb12', bright: 110, vignette: 30, texRes: 1, affine: 60, wobble: 1,
-    dither: 'bayer4', ditherAmt: 80, crt: true, curve: 20, scan: 85, mask: 70, bloom: 55, chroma: 10, noise: 5 },
-  { id: 'dark', name: L('Pixel sombrio', 'Grim pixels'), lines: 120, palette: 'gothic', bright: 105, vignette: 65, texRes: 2, affine: 100, wobble: 2,
-    dither: 'bayer8', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
-  { id: 'daguerre', name: L('Daguerreótipo', 'Daguerreotype'), lines: 180, palette: 'sepia', bright: 115, vignette: 80, texRes: 2, affine: 70, wobble: 1,
-    dither: 'noise', ditherAmt: 100, crt: true, curve: 30, scan: 30, mask: 0, bloom: 45, chroma: 0, noise: 45 },
-  { id: 'sharp', name: L('Nítido', 'Sharp'), lines: 360, palette: 'rgb15', bright: 100, vignette: 30, texRes: 1, affine: 0, wobble: 0,
+  { id: 'arcade', name: L('Monitor arcade', 'Arcade monitor'), lines: 240, palette: 'rgb12', bright: 110, vignette: 30, smooth: false, texRes: 1, affine: 60, wobble: 1,
+    dither: 'bayer4', ditherAmt: 60, crt: true, curve: 15, scan: 60, mask: 35, bloom: 40, chroma: 10, noise: 5 },
+  { id: 'dark', name: L('Pixel sombrio', 'Grim pixels'), lines: 144, palette: 'gothic', bright: 120, vignette: 45, smooth: false, texRes: 2, affine: 100, wobble: 1,
+    dither: 'bayer4', ditherAmt: 40, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
+  { id: 'daguerre', name: L('Daguerreótipo', 'Daguerreotype'), lines: 240, palette: 'sepia', bright: 125, vignette: 50, smooth: false, texRes: 1, affine: 70, wobble: 1,
+    dither: 'bayer4', ditherAmt: 60, crt: true, curve: 20, scan: 25, mask: 0, bloom: 25, chroma: 0, noise: 12 },
+  { id: 'sharp', name: L('Nítido', 'Sharp'), lines: 360, palette: 'rgb15', bright: 100, vignette: 30, smooth: false, texRes: 1, affine: 0, wobble: 0,
     dither: 'bayer4', ditherAmt: 50, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
+  // plain modern 3D: screen resolution, full color, smooth surfaces, no filters
+  { id: 'clean', name: L('3D limpo', 'Clean 3D'), lines: 0, palette: 'full', bright: 100, vignette: 0, smooth: true, texRes: 1, affine: 0, wobble: 0,
+    dither: 'off', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
 ];
+
+// these presets used to bury the picture in dithering, grain and scanlines; settings saved from the old
+// versions follow the retuned ones
+const RETUNED = {
+  arcade: { lines: 240, palette: 'rgb12', bright: 110, vignette: 30, texRes: 1, affine: 60, wobble: 1,
+    dither: 'bayer4', ditherAmt: 80, crt: true, curve: 20, scan: 85, mask: 70, bloom: 55, chroma: 10, noise: 5 },
+  dark: { lines: 120, palette: 'gothic', bright: 105, vignette: 65, texRes: 2, affine: 100, wobble: 2,
+    dither: 'bayer8', ditherAmt: 100, crt: false, curve: 40, scan: 55, mask: 25, bloom: 35, chroma: 25, noise: 20 },
+  daguerre: { lines: 180, palette: 'sepia', bright: 115, vignette: 80, texRes: 2, affine: 70, wobble: 1,
+    dither: 'noise', ditherAmt: 100, crt: true, curve: 30, scan: 30, mask: 0, bloom: 45, chroma: 0, noise: 45 },
+};
 
 const on = (v) => v && v !== 'off';
 
 // [section title, controls]; a control with `options` is a select, `toggle` a checkbox, otherwise a 0–100% slider.
 const SECTIONS = [
   [L('Imagem', 'Image'), [
-    { key: 'lines', label: L('Resolução', 'Resolution'), info: true, options: [360, 270, 240, 180, 144, 120, 96].map((n) => [n, `${n} ${L('linhas', 'lines')}${n === 240 ? ' (PS1)' : ''}`]) },
-    { key: 'palette', label: L('Cores', 'Colors'), options: [['rgb15', L('32 mil (PS1, 15 bits)', '32 thousand (PS1, 15-bit)')], ['rgb12', '4096 (12 bits)'], ['rgb9', '512 (9 bits)'], ['rgb6', '64 (6 bits)'], ['gothic', L('Paleta gótica (32)', 'Gothic palette (32)')], ['sepia', L('Daguerreótipo (8 tons)', 'Daguerreotype (8 tones)')]] },
+    { key: 'lines', label: L('Resolução', 'Resolution'), info: true, options: [0, 360, 270, 240, 180, 144, 120, 96].map((n) => [n,
+      n ? `${n} ${L('linhas', 'lines')}${n === 240 ? ' (PS1)' : ''}` : L('Nativa (da tela)', 'Native (screen)')]) },
+    { key: 'palette', label: L('Cores', 'Colors'), options: [['full', L('Cores reais (24 bits)', 'True color (24-bit)')], ['rgb15', L('32 mil (PS1, 15 bits)', '32 thousand (PS1, 15-bit)')], ['rgb12', '4096 (12 bits)'], ['rgb9', '512 (9 bits)'], ['rgb6', '64 (6 bits)'], ['gothic', L('Paleta gótica (32)', 'Gothic palette (32)')], ['sepia', L('Daguerreótipo (8 tons)', 'Daguerreotype (8 tones)')]] },
     { key: 'bright', label: L('Brilho', 'Brightness'), min: 50, max: 160 },
     { key: 'vignette', label: L('Vinheta', 'Vignette') },
+    // smooth shading, filtered textures, antialiased edges and soft shadows instead of facets and hard pixels
+    { key: 'smooth', label: L('Acabamento liso', 'Smooth finish'), toggle: true },
   ]],
   [L('Texturas', 'Textures'), [
     { key: 'texRes', label: L('Resolução', 'Resolution'), options: [[1, 'Original'], [2, L('Metade', 'Half')], [4, L('Um quarto', 'A quarter')]] },
@@ -72,6 +89,11 @@ function load() {
   const v = defaults();
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { /* private mode or corrupt data */ }
+  for (const [id, old] of Object.entries(RETUNED)) {
+    if (!Object.keys(old).every((k) => saved[k] === old[k])) continue;
+    const { id: _, name, ...now } = PRESETS.find((pr) => pr.id === id);
+    Object.assign(saved, now);
+  }
   for (const c of CONTROLS) {
     const s = saved[c.key];
     if (typeof s !== typeof v[c.key]) continue;

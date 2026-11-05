@@ -109,7 +109,7 @@
   background: radial-gradient(circle, #182234, #06080e 75%);
   border: 2px solid #3a4658;
   box-shadow: inset 0 0 0 1px #000;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
 }
 .inv-slot img { width: 94%; height: 94%; image-rendering: pixelated; pointer-events: none; }
 .inv-slot img:not([src]) { visibility: hidden; }
@@ -137,7 +137,7 @@
   padding: 0 12px 0 22px;
   font-size: clamp(18px, 3.8vmin, 28px);
   letter-spacing: 2px;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
   position: relative;
 }
 body.touch .inv-opt { min-height: 44px; }
@@ -167,7 +167,7 @@ body.touch .inv-opt { min-height: 44px; }
 #inv.examining .inv-col,
 #inv.examining .inv-grid { display: none; }
 #inv.examining .inv-body { grid-template-columns: 1fr; }
-#inv.examining .inv-pv { max-width: min(52vh, 70vw); cursor: pointer; }
+#inv.examining .inv-pv { max-width: min(52vh, 70vw); cursor: var(--cur-on, pointer); }
 
 /* short landscape phones: drop the title and the key hints */
 @media (max-height: 460px) {
@@ -196,7 +196,7 @@ body.touch .inv-opt { min-height: 44px; }
   font-size: clamp(18px, 3.4vmin, 28px);
   white-space: nowrap;
   text-shadow: 2px 2px 0 #000;
-  cursor: pointer;
+  cursor: var(--cur-on, pointer);
 }
 #invPrompt b {
   font-weight: normal;

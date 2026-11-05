@@ -40,7 +40,6 @@ export class Hud {
     this.lu.innerHTML = `<h1 id="luTitle"></h1><h2 id="luRank"></h2><p id="luHint"></p><div id="perks"></div>
       <p class="lu-keys desk-only">${L('1 · 2 · 3 — ou mova o mouse e clique', '1 · 2 · 3 — or move the mouse and click')}</p>`;
     this.perkSel = 0;
-    this.perkAcc = 0;
     this.perkKeys = [];
     this.perkOpenAt = 0;
     this.onPick = null;
@@ -68,12 +67,11 @@ export class Hud {
     this.toastTimer = 2.5;
   }
 
-  // --- level-up: three perk cards, chosen by tap/click, 1-2-3, arrows or mouse sweep under pointer lock
+  // --- level-up: three perk cards, chosen by tap/click (cursor.js draws the pointer under pointer lock), 1-2-3 or arrows
   showPerks(info, onPick) {
     this.onPick = onPick;
     this.perkKeys = info.choices.map((c) => c.key);
     this.perkSel = Math.min(this.perkSel, this.perkKeys.length - 1);
-    this.perkAcc = 0;
     $('luTitle').textContent = `${L('Nível', 'Level')} ${info.level}`;
     $('luRank').textContent = info.rank.name;
     $('luRank').style.color = hex(info.rank.color);
@@ -105,17 +103,13 @@ export class Hud {
   }
 
   // Polled every frame while choosing; returns the chosen perk key or null.
+  // (The mouse picks through the pointer: hovering a card selects it, a click on it chooses it.)
   perkInput(input) {
     if (!this.perkReady()) return null;
-    this.perkAcc += input.dx;
-    if (Math.abs(this.perkAcc) > 90) {
-      this.selectPerk(this.perkSel + Math.sign(this.perkAcc));
-      this.perkAcc = 0;
-    }
     if (input.hit('ArrowLeft') || input.hit('KeyA')) this.selectPerk(this.perkSel - 1);
     if (input.hit('ArrowRight') || input.hit('KeyD')) this.selectPerk(this.perkSel + 1);
     for (let i = 0; i < this.perkKeys.length; i++) if (input.hit(`Digit${i + 1}`) || input.hit(`Numpad${i + 1}`)) return this.perkKeys[i];
-    if (input.hit('Enter') || input.hit('Mouse0')) return this.perkKeys[this.perkSel];
+    if (input.hit('Enter')) return this.perkKeys[this.perkSel];
     return null;
   }
 

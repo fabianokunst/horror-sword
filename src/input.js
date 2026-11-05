@@ -29,14 +29,28 @@ export class Input {
     }, true);
     // freeLook: pointer lock was refused (embedded browsers, iframes), so plain mouse movement steers the camera
     this.freeLook = false;
+    // ui: a choice screen is open (level-up, inventory, merchant). The mouse then drives a pointer
+    // (cursor.js, or the system one in freeLook) and its left click lands on what it points at,
+    // so neither reaches the game as look movement or as a Mouse0 press.
+    this.ui = false;
     addEventListener('mousemove', (e) => {
-      if (!this.locked && !this.freeLook) return;
+      if (this.ui || (!this.locked && !this.freeLook)) return;
       this.dx += e.movementX;
       this.dy += e.movementY;
     });
     addEventListener('mousedown', (e) => {
+      if (this.ui && e.button === 0) return;
       if (this.locked || this.freeLook) this.pressed.add('Mouse' + e.button);
     });
+    // the mouse wheel cycles the sword runes: one step per notch (a trackpad's stream of events is spaced out)
+    this.wheelAt = 0;
+    addEventListener('wheel', (e) => {
+      if (this.ui || (!this.locked && !this.freeLook) || !e.deltaY) return;
+      const now = performance.now();
+      if (now - this.wheelAt < 160) return;
+      this.wheelAt = now;
+      this.pressed.add(e.deltaY > 0 ? 'WheelDown' : 'WheelUp');
+    }, { passive: true });
     addEventListener('contextmenu', (e) => e.preventDefault());
     // iOS Safari ignores user-scalable=no; block pinch zoom explicitly
     document.addEventListener('gesturestart', (e) => e.preventDefault());
