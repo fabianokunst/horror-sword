@@ -554,6 +554,13 @@ async function desktop(browser, url, errors) {
     }, house);
     check('isometric view: diagonal, true angle, silhouette only through the house, and back', iso.on && iso.diagonal && Math.abs(iso.pitch - 0.6155) < 0.01 && iso.behind > 40 && iso.open < 5 && iso.off, iso);
   }
+
+  // C switches the view during the hunt (saved like the setting) and no longer dodges
+  await page.evaluate(() => { const p = __hs.player, f = p.tryRoll.bind(p); window.__rolled = false; p.tryRoll = (...a) => { window.__rolled = true; return f(...a); }; });
+  const cKey = async () => { await page.keyboard.press('KeyC'); await frames(page, 3); return page.evaluate(() => ({ iso: __hs.isoView.on, saved: __hs.settings.values.view })); };
+  const c1 = await cKey(), c2 = await cKey();
+  const cRolled = await page.evaluate(() => window.__rolled);
+  check('C key: isometric view and back, without dodging', c1.iso && c1.saved === 'iso' && !c2.iso && c2.saved === 'third' && !cRolled, { c1, c2, cRolled });
   await page.close();
 }
 
@@ -637,6 +644,9 @@ async function gamepad(browser, url, errors) {
   await press(1); // B
   const padBack = await page.waitForFunction(() => __hs.state() === 'play', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('controller: D-pad down opens the valley map, B closes it', padMap && padBack, { padMap, padBack });
+  await page.evaluate(() => { const p = __hs.player, f = p.tryRoll.bind(p); window.__rolled = false; p.tryRoll = (...a) => { window.__rolled = true; return f(...a); }; });
+  await press(1); // B in the hunt
+  check('controller: B dodges', await page.evaluate(() => window.__rolled && !__hs.isoView.on));
   await press(9); // Start
   const paused = await page.waitForFunction(() => __hs.state() === 'pause', { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('controller: Start pauses', paused);
@@ -669,6 +679,11 @@ async function touch(browser, url, errors) {
   if (box) await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
   const locked = await page.waitForFunction(() => __hs.lock.target, { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('touch ALVO button locks a target', !!box && locked);
+  await page.evaluate(() => { const p = __hs.player, f = p.tryRoll.bind(p); window.__rolled = false; p.tryRoll = (...a) => { window.__rolled = true; return f(...a); }; });
+  const esq = await (await page.$('#touch [data-key="Dodge"]'))?.boundingBox();
+  if (esq) await page.touchscreen.tap(esq.x + esq.width / 2, esq.y + esq.height / 2);
+  const tapDodge = await page.waitForFunction(() => window.__rolled, { ...WAIT, timeout: 30000 }).then(() => true, () => false);
+  check('touch ESQUIVA button dodges', !!esq && tapDodge);
   // a tap on the minimap opens the valley map, a tap on the map goes back to the hunt
   const mini = await (await page.$('#tbMap'))?.boundingBox();
   if (mini) await page.touchscreen.tap(mini.x + mini.width / 2, mini.y + mini.height / 2);

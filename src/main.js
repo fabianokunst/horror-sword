@@ -409,6 +409,12 @@ function applyPrefs(v) {
   setVolumes({ music: v.vMusic / 100, sfx: v.vSfx / 100, amb: v.vAmb / 100 });
 }
 settings.onChange = (v) => { retro.apply(v); applyPrefs(v); };
+// C during the hunt: third person ⇄ isometric, the same choice as Configurações → Controles → Perspectiva (saved with it)
+function toggleView() {
+  settings.set({ view: prefs.iso ? 'third' : 'iso' });
+  sfx.select();
+  hud.toast(prefs.iso ? L('Câmera isométrica · C volta', 'Isometric camera · C switches back') : L('Câmera em terceira pessoa · C troca', 'Third-person camera · C switches'));
+}
 retro.apply(settings.values);
 applyPrefs(settings.values);
 
@@ -623,7 +629,8 @@ function frame() {
           : Math.hypot(mv.x, mv.z) > 0 ? Math.atan2(mv.x, mv.z) : camAim;
         player.tryAttack(aim);
       }
-      if ((input.hit('Mouse2') || input.hit('ControlLeft') || input.hit('KeyC')) && player.tryRoll(mv.x, mv.z)) {
+      // (Dodge: the controller's B and the touch ESQUIVA button)
+      if ((input.hit('Mouse2') || input.hit('ControlLeft') || input.hit('Dodge')) && player.tryRoll(mv.x, mv.z)) {
         sfx.dodge();
         fx.burst(player.pos.clone().setY(player.pos.y + 0.2), 0x7a6a50, 8, { speed: 3, up: 1.5, life: 0.4 });
       }
@@ -644,6 +651,7 @@ function frame() {
       if (input.hit('WheelUp') || input.hit('RunePrev')) blade.next(-1);
       for (let i = 0; i < 6; i++) if (input.hit(`Digit${i + 1}`)) blade.slot(i);
       if (input.hit('KeyN')) { toggleMute(); soundLabel(); }
+      if (input.hit('KeyC')) toggleView();
       if (input.hit('KeyM')) openMap();
       if (input.hit('KeyE')) useOrPickup();
       if (input.hit('Tab') || input.hit('KeyI')) { state = 'inv'; inv.open(); touch.show(false); }

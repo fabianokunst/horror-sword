@@ -98,7 +98,7 @@ export class Gamepads {
       if (!sword) this.repeat = 0;
       const tap = (i, code) => { if (edge(i)) { inp.press(code); inp.release(code); } };
       tap(B.A, 'Space');
-      tap(B.B, 'KeyC');
+      tap(B.B, 'Dodge');
       tap(B.Y, 'KeyQ');
       tap(B.RT, 'KeyV');
       tap(B.LEFT, 'RunePrev');

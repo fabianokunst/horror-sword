@@ -34,7 +34,7 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Shift | correr |
 | Espaço | pular |
 | Clique esquerdo | espada (combo de 3 golpes, mira assistida) |
-| Clique direito / Ctrl / C | esquiva com invencibilidade |
+| Clique direito / Ctrl | esquiva com invencibilidade |
 | Q / F / botão do meio | besta de prata (6 virotes, recarregam sozinhos) |
 | R | travar alvo (câmera, espada e besta miram a criatura; um movimento rápido do mouse para o lado troca de alvo) |
 | V | **Arte** da lâmina, com a barra de Fúria cheia (veja Runas e Fúria) |
@@ -43,6 +43,7 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 | Mouse nas telas de escolha | no inventário, nas cartas de dom e no mercador aparece um ponteiro em forma de espada: aponte (ele fica dourado sobre o que dá para clicar) e clique; botão direito volta |
 | E | pegar item brilhando no chão · rezar no santuário · falar com o mercador |
 | M | **mapa do vale** (M de novo ou clique direito fecha; veja Mapa e guia) |
+| C | troca a câmera: terceira pessoa ⇄ isométrica (veja Vista isométrica) |
 | N | liga/desliga o som (também há o botão SOM no menu) |
 | Esc | pausa |
 
@@ -66,7 +67,7 @@ Cada push na `main` roda [`.github/workflows/deploy.yml`](.github/workflows/depl
 
 O controle vibra ao levar golpe e na esquiva perfeita (onde o navegador permite). Em **Configurações → Controles** dá para trocar a perspectiva (terceira pessoa ou isométrica, veja abaixo), mudar a sensibilidade da câmera (mouse, toque e controle), inverter o eixo vertical e desligar a vibração; em **Mapa**, se o minimapa gira com a câmera e se o marcador do objetivo aparece na tela; em **Som**, os volumes de música, efeitos e ambiente.
 
-**Vista isométrica** (Configurações → Controles → Perspectiva): a câmera sobe e olha o caçador de cima, no ângulo isométrico de verdade (35°), começando na diagonal mais próxima. Mouse, analógico direito e o lado direito da tela ainda giram a vista em volta dele, mas ela não inclina e não gira sozinha com o alvo travado. Sem alvo, espada, besta e R miram para onde o caçador anda ou está virado. Quando uma casa, árvore ou morro fica entre a câmera e ele, a silhueta do caçador aparece através, pontilhada na cor do título.
+**Vista isométrica** (**C** durante a caçada, ou Configurações → Controles → Perspectiva, que guarda a mesma escolha; no controle e no toque, só pelo menu): a câmera sobe e olha o caçador de cima, no ângulo isométrico de verdade (35°), começando na diagonal mais próxima. Mouse, analógico direito e o lado direito da tela ainda giram a vista em volta dele, mas ela não inclina e não gira sozinha com o alvo travado. Sem alvo, espada, besta e R miram para onde o caçador anda ou está virado. Quando uma casa, árvore ou morro fica entre a câmera e ele, a silhueta do caçador aparece através, pontilhada na cor do título.
 
 ### Celular e tablet
 

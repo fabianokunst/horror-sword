@@ -24,7 +24,7 @@ export function translatePage() {
   set('.controls.desk-only',
     '<span>WASD</span> move &nbsp; <span>Mouse</span> camera &nbsp; <span>Shift</span> run &nbsp; <span>Space</span> jump<br />' +
     '<span>Left click</span> sword (3-hit combo) &nbsp; <span>Right click / Ctrl</span> dodge &nbsp; <span>Q / F</span> silver crossbow &nbsp; <span>R</span> lock target<br />' +
-    '<span>V</span> blade Art (full Fury) &nbsp; <span>1-6 / X / wheel</span> swap rune<br />' +
+    '<span>V</span> blade Art (full Fury) &nbsp; <span>1-6 / X / wheel</span> swap rune &nbsp; <span>C</span> isometric camera<br />' +
     'Vampires burn at dawn · Red eyes: dodge at the last instant to counter &nbsp; <span>Esc</span> pause &nbsp; <span>M</span> map &nbsp; <span>N</span> sound');
   set('.controls.touch-only',
     '<span>Left side</span> move &nbsp; <span>Right side</span> drag the camera<br />' +
@@ -41,7 +41,7 @@ export function translatePage() {
   set('#win h2', 'Count Dracula has been destroyed');
   set('#winRetry', 'HUNT AGAIN');
   set('#nightLbl', 'DUSK');
-  for (const [key, text] of [['KeyC', 'DODGE'], ['KeyQ', 'BOW'], ['Space', 'JUMP'], ['KeyR', 'TARGET'], ['KeyV', 'ART'], ['KeyX', 'RUNE']])
+  for (const [key, text] of [['Dodge', 'DODGE'], ['KeyQ', 'BOW'], ['Space', 'JUMP'], ['KeyR', 'TARGET'], ['KeyV', 'ART'], ['KeyX', 'RUNE']])
     set(`#touch [data-key="${key}"] small`, text);
   set('#tbSprint small', 'RUN');
   label('#tbPause', 'Pause');
