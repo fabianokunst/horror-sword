@@ -3,7 +3,8 @@ import '@fontsource/pirata-one';
 import '@fontsource/vt323';
 import * as THREE from 'three';
 import { RetroRenderer, lambert, glowSprite, pixelTexture } from './ps1.js';
-import { World, heightAt, WATER, findSpawn, CASTLE } from './world.js';
+import { MIST } from './fog.js';
+import { World, heightAt, groundAt, WATER, findSpawn, CASTLE } from './world.js';
 import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Effects } from './effects.js';
@@ -460,9 +461,15 @@ function updateSky(dt) {
   sky.copy(bloodMoon ? C.blood : C.night).lerp(C.day, dayAmt).lerp(C.dusk, dusk * 0.6);
   scene.background.copy(sky);
   scene.fog.color.copy(sky);
-  world.castle.userData.hazeMat.emissive.copy(sky).multiplyScalar(0.35 + dayAmt * 0.3);
   scene.fog.near = 6 + dayAmt * 20;
   scene.fog.far = 70 + dayAmt * 90;
+  // valley mist (fog.js): thick up to a few meters above the hunter's ground, thinning above that, so the
+  // castle's crag and the mountains rise out of it; by day a light haze stays up high too. At night
+  // lights carry through the dark (windows, lanterns, glowing eyes)
+  MIST.x = groundAt(player.pos.x, player.pos.z) + 6;
+  MIST.y = 7;
+  MIST.z = 0.06 + dayAmt * 0.16;
+  MIST.w = 3 - dayAmt * 2;
 
   const useSun = elev > -0.05;
   const dir = useSun ? sunDir : moonDir;

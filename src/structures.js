@@ -7,9 +7,6 @@ import { mulberry32 } from './rng.js';
 
 export const WORLD_MAT = ps1(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.06);
 export const WORLD_GLOW = ps1(new THREE.MeshBasicMaterial({ vertexColors: true }));
-// the castle ignores fog so its silhouette is always visible; emissive is driven by the sky as fake haze
-export const CASTLE_MAT = ps1(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }));
-export const CASTLE_GLOW = ps1(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
 
 const P = {
   plaster: 0xe6d6b0, beam: 0x3a2414, stone: 0x8a8494, dark: 0x4a4454, wood: 0x6a4428, win: 0xffb040,
@@ -555,7 +552,7 @@ export function buildCastle(x, y, z) {
   }
   // ghostly purple fires flanking the approach
   for (const sx of [-1, 1]) brazier(s, sx * 9, 37, 0xb040ff, 3);
-  return s.finish(CASTLE_MAT, CASTLE_GLOW);
+  return s.finish();
 }
 
 // ------------------------------------------------------------------ the count's earth-filled coffins

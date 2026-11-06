@@ -332,7 +332,6 @@ export class World {
 
     const castle = this.addSite(S.buildCastle(CASTLE.x, CASTLE.h, CASTLE.z));
     this.castle = castle.root;
-    this.castle.userData.hazeMat = S.CASTLE_MAT;
     this.gate = { x: CASTLE.x, z: CASTLE.z + 30, open: false, obj: castle.root.getObjectByName('gate'), obstacles: castle.gateObstacles, lift: 0 };
     for (const o of this.gate.obstacles) this.addObstacle(o);
     this.arena = { x: CASTLE.x, z: CASTLE.z + 8, r: 24 };
