@@ -1,4 +1,5 @@
-// Settings panel: video presets and the retro image filters, plus controls (camera sensitivity, inverted Y),
+// Settings panel: video presets and the retro image filters, plus controls (third-person or isometric view,
+// camera sensitivity, inverted Y),
 // sound volumes and the map aids (minimap turning with the camera, objective marker). Everything is edited live
 // and persisted in localStorage.
 import { L } from './i18n.js';
@@ -67,6 +68,8 @@ const SECTIONS = [
   ]],
   // not part of the video presets (pref: true)
   [L('Controles', 'Controls'), [
+    // isometric: high above the hunter, turned but never tilted by the look controls (isoview.js)
+    { key: 'view', label: L('Perspectiva', 'View'), options: [['third', L('Terceira pessoa', 'Third person')], ['iso', L('Isométrica', 'Isometric')]], pref: true },
     { key: 'sens', label: L('Sensibilidade da câmera', 'Camera sensitivity'), min: 25, max: 300, pref: true },
     { key: 'invertY', label: L('Inverter eixo vertical', 'Invert vertical axis'), toggle: true, pref: true },
     { key: 'vibrate', label: L('Vibração (celular e controle)', 'Vibration (phone and controller)'), toggle: true, pref: true },
@@ -83,7 +86,7 @@ const SECTIONS = [
 ];
 const CONTROLS = SECTIONS.flatMap(([, list]) => list);
 const VIDEO = CONTROLS.filter((c) => !c.pref);
-const PREFS = { sens: 100, invertY: false, vibrate: true, mapRotate: true, waypoint: true, vMusic: 100, vSfx: 100, vAmb: 100 };
+const PREFS = { view: 'third', sens: 100, invertY: false, vibrate: true, mapRotate: true, waypoint: true, vMusic: 100, vSfx: 100, vAmb: 100 };
 
 function defaults() {
   const { id, name, ...v } = PRESETS[0];

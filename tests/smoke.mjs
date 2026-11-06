@@ -509,6 +509,51 @@ async function desktop(browser, url, errors) {
   await page.keyboard.press('KeyM');
   const mapClosed = await page.waitForFunction(() => __hs.state() === 'play' && document.getElementById('worldmap').classList.contains('hidden'), { ...WAIT, timeout: 30000 }).then(() => true, () => false);
   check('valley map: M opens it (hunt paused, sheet painted) and closes it', mapOpen && sheet.w > 100 && sheet.painted && sheet.paused && /CAP\. III/.test(sheet.title) && mapClosed, { mapOpen, ...sheet, mapClosed });
+
+  // isometric view (Configurações → Perspectiva): it starts on a diagonal at the true isometric angle, and the
+  // hunter's silhouette shows through the house standing between him and the camera (and not out in the open)
+  if (house) {
+    const iso = await page.evaluate(async (h) => {
+      const { player, enemies, isoView, settings, retro, scene } = __hs;
+      enemies.reset();
+      settings.set({ view: 'iso' });
+      const q = Math.PI / 2, yaw = __hs.cam();
+      const out = { on: isoView.on, diagonal: Math.abs((((yaw % q) + q) % q) - q / 2) < 1e-6 };
+      const raf = () => new Promise((r) => requestAnimationFrame(r));
+      const r = retro.renderer, gl = r.getContext(), W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, S = 80;
+      // pixels the silhouette changes around the middle of the screen, where the hunter stands
+      const silhouette = async (x, z, camYaw) => {
+        player.pos.set(x, player.pos.y, z);
+        player.vel.set(0, 0, 0);
+        __hs.setCam(camYaw);
+        for (let i = 0; i < 12; i++) await raf();
+        const shot = () => {
+          r.setRenderTarget(null);
+          r.render(scene, isoView.camera);
+          const b = new Uint8Array(S * S * 4);
+          gl.readPixels((W - S) >> 1, (H - S) >> 1, S, S, gl.RGBA, gl.UNSIGNED_BYTE, b);
+          return b;
+        };
+        const a = shot();
+        for (const t of isoView.twins) t.visible = false;
+        const b = shot();
+        for (const t of isoView.twins) t.visible = true;
+        let n = 0;
+        for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 24) n++;
+        return n;
+      };
+      const hz = (h[2] + h[3]) / 2;
+      // camera to the east (yaw π/2): west of the house the hunter is behind it, east of it he is in the open
+      out.behind = await silhouette(h[0] - 1.2, hz, Math.PI / 2);
+      const c = isoView.camera.position;
+      out.pitch = +Math.atan2(c.y - player.pos.y - 1, Math.hypot(c.x - player.pos.x, c.z - player.pos.z)).toFixed(4);
+      out.open = await silhouette(h[1] + 1.5, hz, Math.PI / 2);
+      settings.set({ view: 'third' });
+      out.off = !isoView.on && isoView.twins.every((t) => !t.visible);
+      return out;
+    }, house);
+    check('isometric view: diagonal, true angle, silhouette only through the house, and back', iso.on && iso.diagonal && Math.abs(iso.pitch - 0.6155) < 0.01 && iso.behind > 40 && iso.open < 5 && iso.off, iso);
+  }
   await page.close();
 }
 

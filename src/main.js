@@ -20,6 +20,7 @@ import { Gamepads } from './gamepad.js';
 import { Settings } from './settings.js';
 import { LockOn } from './lockon.js';
 import { CameraCollider } from './camcollide.js';
+import { IsoView } from './isoview.js';
 import { Interact } from './interact.js';
 import { Blade } from './runes.js';
 import { WorldMap } from './worldmap.js';
@@ -124,14 +125,16 @@ const pads = new Gamepads(input);
 const ptr = new UiCursor();
 // (the valley map too: the controller and the mouse leave the camera alone while it is open)
 const choosing = () => state === 'inv' || state === 'levelup' || state === 'shop' || state === 'map';
-// camera sensitivity, inverted Y and vibration from the settings panel (applied in applyPrefs below)
-const prefs = { sens: 1, invertY: false, vibrate: true, waypoint: true };
+// view, camera sensitivity, inverted Y and vibration from the settings panel (applied in applyPrefs below)
+const prefs = { iso: false, sens: 1, invertY: false, vibrate: true, waypoint: true };
 const LOOK_K = 0.0024; // radians per mouse pixel at 100% sensitivity
 const hud = new Hud();
 const inv = new Inventory(scene, player, fx, renderer);
 const lock = new LockOn(scene);
 lock.btn = document.querySelector('#touch [data-key="KeyR"]');
 const camCol = new CameraCollider(world);
+const isoView = new IsoView(player);
+let view = camera; // the camera the picture is drawn from: the third-person one or isoView's
 const worldMap = new WorldMap();
 
 const spawnPt = findSpawn();
@@ -390,6 +393,14 @@ const settings = new Settings({
 });
 // controls and sound preferences live in the same panel
 function applyPrefs(v) {
+  const iso = v.view === 'iso';
+  if (iso !== prefs.iso) {
+    // into the isometric view on the nearest diagonal; back out keeps the heading
+    if (iso) camYaw = IsoView.diagonal(camYaw);
+    prefs.iso = iso;
+    isoView.enable(iso);
+    view = iso ? isoView.camera : camera;
+  }
   prefs.sens = v.sens / 100;
   prefs.invertY = v.invertY;
   prefs.vibrate = v.vibrate;
@@ -422,6 +433,7 @@ function resize() {
   const fit = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(MIN_HFOV / 2) / camera.aspect));
   camera.fov = Math.min(95, Math.max(FOV, fit));
   camera.updateProjectionMatrix();
+  isoView.resize(w / h);
 }
 addEventListener('resize', resize);
 // iOS sometimes reports the old size right after rotating
@@ -485,14 +497,14 @@ function updateSky(dt) {
   hemi.intensity = 0.7 + dayAmt * 0.45;
   hemi.color.copy(bloodMoon ? tmp.set(0x602030) : tmp.set(0x3a4a90)).lerp(C.day, dayAmt);
 
-  stars.position.copy(camera.position);
+  stars.position.copy(view.position);
   stars.material.opacity = 1 - dayAmt;
-  moon.position.copy(camera.position).addScaledVector(moonDir, 420);
+  moon.position.copy(view.position).addScaledVector(moonDir, 420);
   moonGlow.position.copy(moon.position);
   moon.material.color.copy(bloodMoon ? C.moonR : tmp.set(0xe8ecff));
   moonGlow.material.color.copy(bloodMoon ? C.moonR : C.moonB);
   moon.material.opacity = moonGlow.material.opacity = 1 - dayAmt * 0.85;
-  sunDisc.position.copy(camera.position).addScaledVector(sunDir, 420);
+  sunDisc.position.copy(view.position).addScaledVector(sunDir, 420);
   sunDisc.visible = elev > -0.15;
 
   retro.material.uniforms.uTint.value.set(1, bloodMoon && isNight ? 0.88 : 1, bloodMoon && isNight ? 0.9 : 1);
@@ -573,17 +585,19 @@ function frame() {
       // before any input is read: held on-screen buttons re-press their keys this frame
       if (input.touch) touch.update(rawDt, player);
       if (lock.target) {
-        // the camera swings to look past the hunter at the target (gently when it is right on top of us)
+        // the camera swings to look past the hunter at the target (gently when it is right on top of us);
+        // the isometric view already shows the whole fight and stays put
         const d = Math.hypot(lock.target.pos.x - player.pos.x, lock.target.pos.z - player.pos.z);
-        camYaw = lerpAngle(camYaw, lock.yaw(player), 1 - Math.exp(-6 * Math.min(1, d / 3) * rawDt));
+        if (!prefs.iso) camYaw = lerpAngle(camYaw, lock.yaw(player), 1 - Math.exp(-6 * Math.min(1, d / 3) * rawDt));
       } else camYaw -= input.dx * LOOK_K * prefs.sens;
-      camPitch = Math.min(1.2, Math.max(-0.3, camPitch + input.dy * LOOK_K * prefs.sens * (prefs.invertY ? -1 : 1)));
+      // (the isometric view never tilts)
+      if (!prefs.iso) camPitch = Math.min(1.2, Math.max(-0.3, camPitch + input.dy * LOOK_K * prefs.sens * (prefs.invertY ? -1 : 1)));
     }
     let f = (input.down('KeyW') ? 1 : 0) - (input.down('KeyS') ? 1 : 0);
     let r = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
     if (input.stick.x || input.stick.y) { f = -input.stick.y; r = input.stick.x; }
     // touch: with one thumb on the stick, lazily swing the camera behind the hunter while running forward
-    if (state === 'play' && input.touch && !lock.target && !input.looking && f > 0.3 && !player.attack && !player.roll)
+    if (state === 'play' && input.touch && !prefs.iso && !lock.target && !input.looking && f > 0.3 && !player.attack && !player.roll)
       camYaw = lerpAngle(camYaw, player.facing + Math.PI, 1 - Math.exp(-1.2 * dt));
     const mv = {
       x: -Math.sin(camYaw) * f + Math.cos(camYaw) * r,
@@ -594,7 +608,10 @@ function frame() {
       face: lock.target ? Math.atan2(lock.target.pos.x - player.pos.x, lock.target.pos.z - player.pos.z) : null,
     };
     if (state !== 'play') mv.x = mv.z = 0;
-    const camAim = Math.atan2(-Math.sin(camYaw), -Math.cos(camYaw));
+    // where R, the blade and the crossbow aim without a target: where the camera looks, or in the isometric
+    // view (which looks down on everything) where the hunter walks or faces
+    const camAim = !prefs.iso ? Math.atan2(-Math.sin(camYaw), -Math.cos(camYaw))
+      : Math.hypot(mv.x, mv.z) > 0 ? Math.atan2(mv.x, mv.z) : player.facing;
 
     if (state === 'play') {
       // without pointer lock the browser never reports Esc as a lock change, so pause by key here
@@ -612,10 +629,11 @@ function frame() {
       }
       if ((input.hit('KeyQ') || input.hit('KeyF') || input.hit('Mouse1')) && player.tryShoot()) {
         const from = player.pos.clone().setY(player.pos.y + 1.5);
-        const t = lock.target || enemies.target(player, camAim, 40, input.touch ? 0.6 : 0.35); // thumbs aim worse than mice
+        // thumbs aim worse than mice, and the isometric view aims only as finely as the hunter turns (8 ways on keys)
+        const t = lock.target || enemies.target(player, camAim, 40, input.touch || prefs.iso ? 0.6 : 0.35);
         const dir = t
           ? new THREE.Vector3(t.pos.x, t.pos.y + (t.T.center ?? 1.1 * (t.T.scale || 1)), t.pos.z).sub(from)
-          : camera.getWorldDirection(camDir).clone();
+          : prefs.iso ? new THREE.Vector3(Math.sin(camAim), 0, Math.cos(camAim)) : camera.getWorldDirection(camDir).clone();
         player.facing = Math.atan2(dir.x, dir.z);
         enemies.fireBolt(from, dir.normalize(), player.stats.boltDmg, player.stats.pierce);
         sfx.bolt();
@@ -719,29 +737,36 @@ function frame() {
   interact.update(rawDt, { play: state === 'play', night, touch: input.touch });
   updateWater(time);
 
-  // third-person camera
-  camTarget.set(player.pos.x, player.pos.y + 1.7, player.pos.z);
-  const want = state === 'menu' ? 7 : 5.4;
-  camBack.set(Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw) * Math.cos(camPitch));
-  // a wall or roof behind the hunter pulls the camera in at once (never show through it); open space lets it ease back
-  const room = camCol.clear(camTarget, camBack, want);
-  camDist = room < camDist ? room : camDist + (room - camDist) * (1 - Math.exp(-4 * rawDt));
-  camera.position.copy(camTarget).addScaledVector(camBack, camDist);
-  const floor = Math.max(heightAt(camera.position.x, camera.position.z), WATER) + 0.5;
-  if (camera.position.y < floor) camera.position.y = floor;
-  // camera right behind the head: hide the hunter instead of filling the screen with the coat
-  if (camDist < 1) player.m.root.visible = false;
-  if (fx.shake > 0) {
-    const s = fx.shake * 0.25;
-    camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y += (Math.random() - 0.5) * s;
+  const shake = fx.shake > 0 ? fx.shake * 0.25 : 0;
+  if (prefs.iso) {
+    // isometric view, centered on the hunter's body (isoview.js); locked on, it slides a little toward the target
+    camTarget.set(player.pos.x, player.pos.y + 1, player.pos.z);
+    if (lock.target && state === 'play') camTarget.lerp(lock.center(camLook), 0.2);
+    isoView.place(camTarget, camYaw, shake, player.rank.color);
+  } else {
+    // third-person camera
+    camTarget.set(player.pos.x, player.pos.y + 1.7, player.pos.z);
+    const want = state === 'menu' ? 7 : 5.4;
+    camBack.set(Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw) * Math.cos(camPitch));
+    // a wall or roof behind the hunter pulls the camera in at once (never show through it); open space lets it ease back
+    const room = camCol.clear(camTarget, camBack, want);
+    camDist = room < camDist ? room : camDist + (room - camDist) * (1 - Math.exp(-4 * rawDt));
+    camera.position.copy(camTarget).addScaledVector(camBack, camDist);
+    const floor = Math.max(heightAt(camera.position.x, camera.position.z), WATER) + 0.5;
+    if (camera.position.y < floor) camera.position.y = floor;
+    // camera right behind the head: hide the hunter instead of filling the screen with the coat
+    if (camDist < 1) player.m.root.visible = false;
+    if (shake) {
+      camera.position.x += (Math.random() - 0.5) * shake;
+      camera.position.y += (Math.random() - 0.5) * shake;
+    }
+    // locked on: aim a little toward the target so flying creatures stay in frame
+    if (lock.target && state === 'play') camTarget.lerp(lock.center(camLook), 0.2);
+    camera.lookAt(camTarget);
   }
-  // locked on: aim a little toward the target so flying creatures stay in frame
-  if (lock.target && state === 'play') camTarget.lerp(lock.center(camLook), 0.2);
-  camera.lookAt(camTarget);
-  hud.waypoint(camera, goal.target, player, state === 'play' && prefs.waypoint);
+  hud.waypoint(view, goal.target, player, state === 'play' && prefs.waypoint);
 
-  retro.render(scene, camera);
+  retro.render(scene, view);
   // after this frame's state changes: until the next one the mouse points at the choice screen or plays
   input.ui = choosing();
   ptr.show(input.ui && state !== 'map' && input.locked && !input.touch);
@@ -756,7 +781,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 if (import.meta.env.DEV) {
   window.__hs = {
-    player, enemies, world, sfx, campaign, lock, camera, camCol, interact, inv, input, ptr, blade, hud, worldMap, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
+    player, enemies, world, sfx, campaign, lock, camera, camCol, isoView, settings, retro, scene, interact, inv, input, ptr, blade, hud, worldMap, setDay: (t) => (dayT = t), setNight: (n) => (night = n),
     state: () => state, witch: () => witch, cam: () => camYaw, camDist: () => camDist,
     setCam: (yaw, pitch) => { camYaw = yaw; if (pitch != null) camPitch = pitch; },
   };

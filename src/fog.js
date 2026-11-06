@@ -9,6 +9,8 @@
 //   the mist around the hunter stays the same up on the crag as down in the valley.
 // - Lights (unlit materials: windows, lanterns, glowing eyes, halos) reach MIST.w times farther, so at
 //   night they still show through the dark, like the castle's windows across the valley.
+// - The isometric view (isoview.js) hangs its camera far above the hunter, so it sets FOG_EYE to a point just
+//   behind his head and the mist is measured from there instead (w = 1; w = 0 measures from the camera).
 // Import this before anything renders: the shader chunks are read when each material compiles.
 import * as THREE from 'three';
 
@@ -17,7 +19,8 @@ import * as THREE from 'three';
 // A plain object (not a Vector4) is shared by reference by every material's uniforms: three.js clones
 // its own math types per material, but copies anything else as it is (UniformsUtils.cloneUniforms).
 export const MIST = { x: 0, y: 0, z: 1, w: 1 };
-for (const lib of Object.values(THREE.ShaderLib)) if (lib.uniforms.fogColor) lib.uniforms.hsMist = { value: MIST };
+export const FOG_EYE = { x: 0, y: 0, z: 0, w: 0 };
+for (const lib of Object.values(THREE.ShaderLib)) if (lib.uniforms.fogColor) Object.assign(lib.uniforms, { hsMist: { value: MIST }, hsEye: { value: FOG_EYE } });
 for (const id of ['basic', 'sprite', 'points']) THREE.ShaderLib[id].fragmentShader = '#define HS_LIGHT\n' + THREE.ShaderLib[id].fragmentShader;
 
 const C = THREE.ShaderChunk;
@@ -39,6 +42,7 @@ C.fog_pars_fragment = /* glsl */ `
 #ifdef USE_FOG
 	uniform vec3 fogColor;
 	uniform vec4 hsMist;
+	uniform vec4 hsEye;
 	varying vec3 vHsFogRel;
 	#ifdef FOG_EXP2
 		uniform float fogDensity;
@@ -60,11 +64,13 @@ C.fog_pars_fragment = /* glsl */ `
 
 C.fog_fragment = /* glsl */ `
 #ifdef USE_FOG
-	float hsFogDist = length( vHsFogRel );
+	vec3 hsEyeP = hsEye.w > 0.5 ? hsEye.xyz : cameraPosition;
+	vec3 hsRel = hsEye.w > 0.5 ? cameraPosition + vHsFogRel - hsEye.xyz : vHsFogRel;
+	float hsFogDist = length( hsRel );
 	if ( hsMist.y > 0.0 ) {
-		float hsDy = vHsFogRel.y;
-		hsFogDist *= abs( hsDy ) < 0.05 ? hsMistRho( cameraPosition.y )
-			: ( hsMistInt( cameraPosition.y + hsDy ) - hsMistInt( cameraPosition.y ) ) / hsDy;
+		float hsDy = hsRel.y;
+		hsFogDist *= abs( hsDy ) < 0.05 ? hsMistRho( hsEyeP.y )
+			: ( hsMistInt( hsEyeP.y + hsDy ) - hsMistInt( hsEyeP.y ) ) / hsDy;
 	}
 	#ifdef HS_LIGHT
 		hsFogDist /= max( hsMist.w, 1.0 );
