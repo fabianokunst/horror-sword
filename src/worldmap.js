@@ -105,6 +105,115 @@ const PICS = {
 // where each name goes, relative to the landmark (metres)
 const LABEL = { village: [0, 34], cemetery: [0, -24], bridge: [46, 3], windmill: [0, 22], gallows: [-4, -15], abbey: [0, 22], castle: [0, -44] };
 
+// The valley sheet, `w` pixels wide: relief, paper, mountains, forests, roads and the landmark pictures; the
+// full sheet adds the names, the compass and the frame. The minimap (hud.js) turns with the camera, so it takes
+// the sheet without text and writes its names upright on top.
+let relief = null;
+export const SHEET = V;
+export function paintSheet(w, full = true) {
+  const b = document.createElement('canvas');
+  b.width = w;
+  b.height = Math.round((w * VH) / VW);
+  const g = b.getContext('2d'), k = w / VW, u = w / 700; // u: line/text scale against a 700 px sheet
+  const at = (x, z) => [(x - V.x0) * k, (z - V.z0) * k];
+  g.imageSmoothingEnabled = true;
+  g.drawImage((relief ??= paintRelief()), -k * STEP / 2, -k * STEP / 2, (VW + STEP) * k, (VH + STEP) * k);
+  const rnd = mulberry32(99);
+  // paper: specks and stains (the full sheet darkens toward the edges)
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = `rgba(90, 60, 30, ${0.04 + rnd() * 0.08})`;
+    g.beginPath(); g.arc(rnd() * b.width, rnd() * b.height, (0.5 + rnd() * 2.5) * u, 0, Math.PI * 2); g.fill();
+  }
+  if (full) {
+    const edge = g.createRadialGradient(b.width / 2, b.height / 2, b.width * 0.3, b.width / 2, b.height / 2, b.width * 0.75);
+    edge.addColorStop(0, 'rgba(60, 30, 10, 0)');
+    edge.addColorStop(1, 'rgba(60, 30, 10, 0.45)');
+    g.fillStyle = edge;
+    g.fillRect(0, 0, b.width, b.height);
+  }
+
+  // mountains along the ring
+  g.strokeStyle = 'rgba(70, 45, 25, 0.75)';
+  g.fillStyle = 'rgba(70, 45, 25, 0.22)';
+  g.lineWidth = Math.max(1, 1.1 * u);
+  for (let z = V.z0; z < V.z1; z += 13) for (let x = V.x0; x < V.x1; x += 15) {
+    const px = x + (rnd() - 0.5) * 10, pz = z + (rnd() - 0.5) * 9, e = mapE(px, pz);
+    if (e < 0.97 || e > 1.18) continue;
+    const [sx, sy] = at(px, pz), hw = (4 + rnd() * 3) * k, hh = hw * (1.1 + rnd() * 0.5);
+    g.beginPath(); g.moveTo(sx - hw, sy); g.lineTo(sx, sy - hh); g.lineTo(sx + hw, sy); g.stroke();
+    g.beginPath(); g.moveTo(sx, sy - hh); g.lineTo(sx + hw, sy); g.lineTo(sx + hw * 0.2, sy); g.fill();
+  }
+  // forests: little trees (bare ones in the dead woods by the castle)
+  for (let z = V.z0; z < V.z1; z += 7) for (let x = V.x0; x < V.x1; x += 7) {
+    const px = x + (rnd() - 0.5) * 5, pz = z + (rnd() - 0.5) * 5, f = forestAt(px, pz);
+    if (!f || heightAt(px, pz) < 1 || roadNear(px, pz, 5)) continue;
+    const [sx, sy] = at(px, pz), r = (1.6 + rnd() * 0.8) * k;
+    if (f.dead && rnd() < f.dead) {
+      g.strokeStyle = 'rgba(60, 40, 40, 0.7)';
+      g.lineWidth = Math.max(0.8, 0.8 * u);
+      g.beginPath(); g.moveTo(sx, sy + r); g.lineTo(sx, sy - r); g.moveTo(sx, sy - r * 0.2); g.lineTo(sx - r * 0.8, sy - r); g.moveTo(sx, sy); g.lineTo(sx + r * 0.8, sy - r * 0.8); g.stroke();
+    } else {
+      g.fillStyle = 'rgba(52, 72, 40, 0.75)';
+      g.beginPath(); g.arc(sx, sy - r * 0.3, r, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(40, 25, 15, 0.8)';
+      g.fillRect(sx - 0.4 * u, sy + r * 0.5, 0.8 * u + 0.4, r * 0.6);
+    }
+  }
+  // roads: ink edges with a pale track
+  g.lineCap = g.lineJoin = 'round';
+  for (const [style, width] of [['#6a4a2a', 4.2], ['#eadab0', 2]]) {
+    g.strokeStyle = style;
+    g.lineWidth = Math.max(width * 0.6, width * u);
+    for (const rd of ROADS) {
+      g.beginPath();
+      rd.forEach(([x, z], i) => { const [sx, sy] = at(x, z); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); });
+      g.stroke();
+    }
+  }
+  // landmarks, then (full sheet) their names, the compass and the frame
+  g.fillStyle = g.strokeStyle = INK;
+  for (const p of PLACES) {
+    const [sx, sy] = at(p.x, p.z);
+    PICS[p.id]?.(g, sx, sy, Math.max(k * 0.9, 1.15 * u));
+  }
+  if (!full) return b;
+  const label = (text, x, z, size, color = INK, italic = false) => {
+    const [sx, sy] = at(x, z);
+    g.font = `${italic ? 'italic ' : ''}${Math.round(size * u)}px 'Pirata One', serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 4 * u;
+    g.strokeStyle = 'rgba(232, 216, 178, 0.85)';
+    g.strokeText(text, sx, sy);
+    g.fillStyle = color;
+    g.fillText(text, sx, sy);
+  };
+  for (const p of PLACES) {
+    const [dx, dz] = LABEL[p.id] || [0, 20];
+    label(p.name, p.x + dx, p.z + dz, p.id === 'castle' || p.id === 'village' ? 26 : 21);
+  }
+  label(L('Rio Argeș', 'Argeș River'), -150, riverZ(-150) - 11, 19, '#2a4a62', true);
+  label(L('Lago Escuro', 'Dark Lake'), LAKE.x, LAKE.z, 17, '#2a4a62', true);
+  label(L('Montes Cárpatos', 'Carpathian Mountains'), -150, -236, 20, '#5a3a20', true);
+  // compass
+  const [cx, cy] = [b.width - 46 * u, b.height - 56 * u], R = 22 * u;
+  g.fillStyle = INK;
+  g.beginPath(); g.moveTo(cx, cy - R); g.lineTo(cx + R * 0.28, cy); g.lineTo(cx, cy + R * 0.6); g.lineTo(cx - R * 0.28, cy); g.fill();
+  g.strokeStyle = INK;
+  g.lineWidth = 1.2 * u;
+  g.beginPath(); g.arc(cx, cy, R * 0.75, 0, Math.PI * 2); g.stroke();
+  g.font = `${Math.round(18 * u)}px 'Pirata One', serif`;
+  g.textAlign = 'center';
+  g.fillText('N', cx, cy - R - 10 * u);
+  // double frame
+  g.strokeStyle = INK;
+  g.lineWidth = 2 * u;
+  g.strokeRect(6 * u, 6 * u, b.width - 12 * u, b.height - 12 * u);
+  g.lineWidth = 1 * u;
+  g.strokeRect(11 * u, 11 * u, b.width - 22 * u, b.height - 22 * u);
+  return b;
+}
+
 export class WorldMap {
   constructor() {
     const el = (this.el = document.createElement('div'));
@@ -124,7 +233,6 @@ export class WorldMap {
     document.body.append(el);
     this.canvas = el.querySelector('canvas');
     this.ctx = this.canvas.getContext('2d');
-    this.relief = null;
     this.base = null; // relief + ink at the current size
     this.size = 0;
     this.openAt = 0;
@@ -132,7 +240,7 @@ export class WorldMap {
     el.addEventListener('click', () => { if (performance.now() - this.openAt > GRACE) this.tapped = true; });
     addEventListener('resize', () => (this.size = 0));
     // paint the relief while the game is idle, so the first open does not stall
-    (window.requestIdleCallback || setTimeout)(() => this.relief ??= paintRelief(), { timeout: 4000 });
+    (window.requestIdleCallback || setTimeout)(() => (relief ??= paintRelief()), { timeout: 4000 });
   }
 
   get isOpen() { return !this.el.classList.contains('hidden'); }
@@ -166,103 +274,7 @@ export class WorldMap {
     this.canvas.width = w;
     this.canvas.height = Math.round((w * VH) / VW);
     this.size = r.width;
-    this.relief ??= paintRelief();
-    const b = (this.base = document.createElement('canvas'));
-    b.width = this.canvas.width;
-    b.height = this.canvas.height;
-    const g = b.getContext('2d'), k = this.k, u = w / 700; // u: line/text scale against a 700 px sheet
-    g.imageSmoothingEnabled = true;
-    g.drawImage(this.relief, -k * STEP / 2, -k * STEP / 2, (VW + STEP) * k, (VH + STEP) * k);
-    const rnd = mulberry32(99);
-    // paper: specks and stains, darker toward the edges
-    for (let i = 0; i < 260; i++) {
-      g.fillStyle = `rgba(90, 60, 30, ${0.04 + rnd() * 0.08})`;
-      g.beginPath(); g.arc(rnd() * b.width, rnd() * b.height, (0.5 + rnd() * 2.5) * u, 0, Math.PI * 2); g.fill();
-    }
-    const edge = g.createRadialGradient(b.width / 2, b.height / 2, b.width * 0.3, b.width / 2, b.height / 2, b.width * 0.75);
-    edge.addColorStop(0, 'rgba(60, 30, 10, 0)');
-    edge.addColorStop(1, 'rgba(60, 30, 10, 0.45)');
-    g.fillStyle = edge;
-    g.fillRect(0, 0, b.width, b.height);
-
-    // mountains along the ring
-    g.strokeStyle = 'rgba(70, 45, 25, 0.75)';
-    g.fillStyle = 'rgba(70, 45, 25, 0.22)';
-    g.lineWidth = Math.max(1, 1.1 * u);
-    for (let z = V.z0; z < V.z1; z += 13) for (let x = V.x0; x < V.x1; x += 15) {
-      const px = x + (rnd() - 0.5) * 10, pz = z + (rnd() - 0.5) * 9, e = mapE(px, pz);
-      if (e < 0.97 || e > 1.18) continue;
-      const [sx, sy] = this.at(px, pz), hw = (4 + rnd() * 3) * k, hh = hw * (1.1 + rnd() * 0.5);
-      g.beginPath(); g.moveTo(sx - hw, sy); g.lineTo(sx, sy - hh); g.lineTo(sx + hw, sy); g.stroke();
-      g.beginPath(); g.moveTo(sx, sy - hh); g.lineTo(sx + hw, sy); g.lineTo(sx + hw * 0.2, sy); g.fill();
-    }
-    // forests: little trees (bare ones in the dead woods by the castle)
-    for (let z = V.z0; z < V.z1; z += 7) for (let x = V.x0; x < V.x1; x += 7) {
-      const px = x + (rnd() - 0.5) * 5, pz = z + (rnd() - 0.5) * 5, f = forestAt(px, pz);
-      if (!f || heightAt(px, pz) < 1 || roadNear(px, pz, 5)) continue;
-      const [sx, sy] = this.at(px, pz), r = (1.6 + rnd() * 0.8) * k;
-      if (f.dead && rnd() < f.dead) {
-        g.strokeStyle = 'rgba(60, 40, 40, 0.7)';
-        g.lineWidth = Math.max(0.8, 0.8 * u);
-        g.beginPath(); g.moveTo(sx, sy + r); g.lineTo(sx, sy - r); g.moveTo(sx, sy - r * 0.2); g.lineTo(sx - r * 0.8, sy - r); g.moveTo(sx, sy); g.lineTo(sx + r * 0.8, sy - r * 0.8); g.stroke();
-      } else {
-        g.fillStyle = 'rgba(52, 72, 40, 0.75)';
-        g.beginPath(); g.arc(sx, sy - r * 0.3, r, 0, Math.PI * 2); g.fill();
-        g.fillStyle = 'rgba(40, 25, 15, 0.8)';
-        g.fillRect(sx - 0.4 * u, sy + r * 0.5, 0.8 * u + 0.4, r * 0.6);
-      }
-    }
-    // roads: ink edges with a pale track
-    g.lineCap = g.lineJoin = 'round';
-    for (const [style, width] of [['#6a4a2a', 4.2], ['#eadab0', 2]]) {
-      g.strokeStyle = style;
-      g.lineWidth = Math.max(width * 0.6, width * u);
-      for (const rd of ROADS) {
-        g.beginPath();
-        rd.forEach(([x, z], i) => { const [sx, sy] = this.at(x, z); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); });
-        g.stroke();
-      }
-    }
-    // landmarks and their names
-    g.fillStyle = g.strokeStyle = INK;
-    for (const p of PLACES) {
-      const [sx, sy] = this.at(p.x, p.z);
-      PICS[p.id]?.(g, sx, sy, Math.max(k * 0.9, 1.15 * u));
-    }
-    const label = (text, x, z, size, color = INK, italic = false) => {
-      const [sx, sy] = this.at(x, z);
-      g.font = `${italic ? 'italic ' : ''}${Math.round(size * u)}px 'Pirata One', serif`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.lineWidth = 4 * u;
-      g.strokeStyle = 'rgba(232, 216, 178, 0.85)';
-      g.strokeText(text, sx, sy);
-      g.fillStyle = color;
-      g.fillText(text, sx, sy);
-    };
-    for (const p of PLACES) {
-      const [dx, dz] = LABEL[p.id] || [0, 20];
-      label(p.name, p.x + dx, p.z + dz, p.id === 'castle' || p.id === 'village' ? 26 : 21);
-    }
-    label(L('Rio Argeș', 'Argeș River'), -150, riverZ(-150) - 11, 19, '#2a4a62', true);
-    label(L('Lago Escuro', 'Dark Lake'), LAKE.x, LAKE.z, 17, '#2a4a62', true);
-    label(L('Montes Cárpatos', 'Carpathian Mountains'), -150, -236, 20, '#5a3a20', true);
-    // compass
-    const [cx, cy] = [b.width - 46 * u, b.height - 56 * u], R = 22 * u;
-    g.fillStyle = INK;
-    g.beginPath(); g.moveTo(cx, cy - R); g.lineTo(cx + R * 0.28, cy); g.lineTo(cx, cy + R * 0.6); g.lineTo(cx - R * 0.28, cy); g.fill();
-    g.strokeStyle = INK;
-    g.lineWidth = 1.2 * u;
-    g.beginPath(); g.arc(cx, cy, R * 0.75, 0, Math.PI * 2); g.stroke();
-    g.font = `${Math.round(18 * u)}px 'Pirata One', serif`;
-    g.textAlign = 'center';
-    g.fillText('N', cx, cy - R - 10 * u);
-    // double frame
-    g.strokeStyle = INK;
-    g.lineWidth = 2 * u;
-    g.strokeRect(6 * u, 6 * u, b.width - 12 * u, b.height - 12 * u);
-    g.lineWidth = 1 * u;
-    g.strokeRect(11 * u, 11 * u, b.width - 22 * u, b.height - 22 * u);
+    this.base = paintSheet(w);
   }
 
   // s: { player, target, path, coffins, shrines, night, merchant, time }

@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
-import { CASTLE, ROADS, PLACES, groundAt } from './world.js';
+import { PLACES, groundAt } from './world.js';
+import { paintSheet, SHEET } from './worldmap.js';
 import { route } from './route.js';
 import './campaign.css';
 import { L } from './i18n.js';
@@ -11,8 +12,14 @@ const el = (tag, props = {}, parent) => {
   parent?.append(n);
   return n;
 };
-const DOT = { ghoul: '#9cff40', vampire: '#ff3050', bat: '#c040ff', bride: '#ff60c0', wolf: '#ffa030', dracula: '#ff0000', witch: '#60ff90' };
 const RANGE = 80; // metres from the minimap centre to its rim
+const SHEET_PPM = 2.5; // pixels per metre of the parchment behind the minimap
+// short landmark names for the minimap
+const SHORT = {
+  village: 'Borgo', cemetery: L('Cemitério', 'Cemetery'), bridge: L('Ponte', 'Bridge'), windmill: L('Moinho', 'Mill'),
+  gallows: L('Forca', 'Gallows'), abbey: L('Abadia', 'Abbey'), castle: L('Castelo', 'Castle'),
+};
+const paintMini = () => paintSheet(Math.round((SHEET.x1 - SHEET.x0) * SHEET_PPM), false);
 
 export class Hud {
   constructor() {
@@ -26,6 +33,8 @@ export class Hud {
     this.mapPx = 0; // backing size of the minimap canvas, redone when its CSS size changes
     new ResizeObserver(() => (this.mapPx = 0)).observe(this.map);
     this.mapRotate = true; // settings: the minimap turns with the camera
+    this.sheet = null; // its parchment, painted while the game is idle (or on the first frame that needs it)
+    (window.requestIdleCallback || setTimeout)(() => (this.sheet ??= paintMini()), { timeout: 3000 });
     this.path = null; // road to the objective (route.js)
     this.pathT = 0;
     this.pathFor = null;
@@ -167,7 +176,7 @@ export class Hud {
     const low = player.hp < 30 ? 0.35 + Math.sin(performance.now() / 200) * 0.15 : 0;
     this.el.vignette.style.opacity = Math.max(low, this.hurtTimer * 2.5);
     this.guide(dt, player, s.target);
-    this.drawMap(player, enemies, world, s.camYaw, s.target);
+    this.drawMap(player, enemies, world, s.camYaw, s.target, s.shrines, night);
     if (s.mapKey !== this.keyHint) this.el.mapKey.innerHTML = this.keyHint = s.mapKey;
     // the landmark around the hunter, named under the minimap
     const here = PLACES.find((p) => Math.hypot(player.pos.x - p.x, player.pos.z - p.z) < p.r + 10);
@@ -186,118 +195,149 @@ export class Hud {
     this.path = route({ x: player.pos.x, z: player.pos.z }, target);
   }
 
-  // Window into the pre-painted valley map. It turns with the camera (straight ahead is up, N marks north)
-  // unless the settings pin north up. Objectives out of range sit on the rim with an arrow and their distance.
-  drawMap(player, enemies, world, camYaw, target) {
+  // A window into the valley sheet (worldmap.js, painted without its names), so the minimap reads like the map
+  // screen: parchment, roads, forests and the landmark pictures. It turns with the camera (straight ahead is up,
+  // the N chip on the rim points north) unless the settings pin north up. Names stay upright, creatures are red
+  // dots, and the objective is a red ◆ on the map, or an arrow on the rim with its distance.
+  drawMap(player, enemies, world, camYaw, target, shrines, night) {
     const cv = this.map, c = this.ctx;
     if (!this.mapPx) {
-      this.mapPx = Math.max(140, Math.round(cv.clientWidth * Math.min(devicePixelRatio || 1, 2)));
+      this.mapCss = cv.clientWidth || 140;
+      this.mapPx = Math.max(100, Math.round(this.mapCss * Math.min(devicePixelRatio || 1, 2)));
       cv.width = cv.height = this.mapPx;
+      this.rimShade = null;
     }
-    const S = this.mapPx, R = S / 2, u = S / 140, k = R / RANGE, M = world.map, mpp = M.size / (M.canvas.width - 1);
-    const px = player.pos.x, pz = player.pos.z, now = performance.now();
+    this.sheet ??= paintMini();
+    const S = this.mapPx, R = S / 2, k = R / RANGE;
+    // u: one "design pixel" of a 180 px minimap, never so small that the names stop being readable
+    const u = (S / this.mapCss) * Math.max(0.8, this.mapCss / 180);
+    const px = player.pos.x, pz = player.pos.z, now = performance.now(), pulse = 0.5 + 0.5 * Math.sin(now / 170);
     const rot = this.mapRotate ? camYaw : 0, cr = Math.cos(rot), sr = Math.sin(rot);
     const to = (x, z) => { const dx = (x - px) * k, dz = (z - pz) * k; return [R + dx * cr - dz * sr, R + dx * sr + dz * cr]; };
+    const inside = (sx, sy, pad) => Math.hypot(sx - R, sy - R) < R - pad * u;
+    const text = (str, sx, sy, color, size, font = 'VT323, monospace', halo = 'rgba(240, 226, 190, 0.92)') => {
+      c.font = `${Math.round(size * u)}px ${font}`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.lineWidth = 3.5 * u;
+      c.lineJoin = 'round';
+      c.strokeStyle = halo;
+      c.strokeText(str, sx, sy);
+      c.fillStyle = color;
+      c.fillText(str, sx, sy);
+    };
     c.save();
     c.clearRect(0, 0, S, S);
     c.beginPath();
     c.arc(R, R, R, 0, Math.PI * 2);
     c.clip();
-    c.fillStyle = '#1a1622';
+    c.fillStyle = '#a88a64'; // past the edge of the sheet: more mountains
     c.fillRect(0, 0, S, S);
-    // terrain and roads, in the turned frame
     c.save();
     c.translate(R, R);
     c.rotate(rot);
     c.imageSmoothingEnabled = true;
-    c.drawImage(M.canvas, (M.x0 - px - mpp / 2) * k, (M.z0 - pz - mpp / 2) * k, M.canvas.width * mpp * k, M.canvas.height * mpp * k);
-    c.fillStyle = 'rgba(0,0,0,0.25)';
-    c.fillRect(-S, -S, S * 2, S * 2);
-    c.lineCap = c.lineJoin = 'round';
-    c.strokeStyle = 'rgba(232, 200, 140, 0.8)';
-    c.lineWidth = Math.max(2 * u, 5 * k);
-    for (const rd of ROADS) {
-      c.beginPath();
-      rd.forEach(([x, z], i) => (i ? c.lineTo : c.moveTo).call(c, (x - px) * k, (z - pz) * k));
-      c.stroke();
-    }
+    c.drawImage(this.sheet, (SHEET.x0 - px) * k, (SHEET.z0 - pz) * k, (SHEET.x1 - SHEET.x0) * k, (SHEET.z1 - SHEET.z0) * k);
     c.restore();
-    // the way to the objective: gold dots marching along the roads
+    // the paper shaded toward the rim
+    if (!this.rimShade) {
+      this.rimShade = c.createRadialGradient(R, R, R * 0.7, R, R, R);
+      this.rimShade.addColorStop(0, 'rgba(40, 20, 5, 0.08)');
+      this.rimShade.addColorStop(1, 'rgba(40, 20, 5, 0.5)');
+    }
+    c.fillStyle = this.rimShade;
+    c.fillRect(0, 0, S, S);
+    // where the camera looks
+    c.save();
+    c.translate(R, R);
+    c.rotate(rot - camYaw);
+    const view = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.75);
+    view.addColorStop(0, 'rgba(20, 80, 140, 0.28)');
+    view.addColorStop(1, 'rgba(20, 80, 140, 0)');
+    c.fillStyle = view;
+    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R * 0.75, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); c.closePath(); c.fill();
+    c.restore();
+    // landmark names, upright, under their pictures (never over the hunter or the N chip)
+    const nx = R + sr * (R - 11 * u), ny = R - cr * (R - 11 * u);
+    for (const p of PLACES) {
+      const [sx, sy] = to(p.x, p.z), y = sy + (p.id === 'village' ? 20 : p.id === 'castle' ? 16 : 11) * k + 7 * u;
+      if (inside(sx, y, 16) && Math.hypot(sx - R, y - R) > 18 * u && Math.hypot(sx - nx, y - ny) > 24 * u) text(SHORT[p.id] || p.name, sx, y, '#2a1a0e', 15, "'Pirata One', serif");
+    }
+    // the way to the objective, in red ink like on the map screen
     if (this.path) {
       c.save();
-      c.strokeStyle = '#ffd860';
-      c.lineWidth = 2.4 * u;
-      c.setLineDash([2.5 * u, 4 * u]);
-      c.lineDashOffset = -now / 60;
+      c.strokeStyle = 'rgba(176, 16, 26, 0.9)';
+      c.lineWidth = 3 * u;
+      c.lineCap = 'round';
+      c.setLineDash([4 * u, 4.5 * u]);
+      c.lineDashOffset = -now / 50;
       c.beginPath();
       this.path.forEach((p, i) => { const [x, y] = i ? to(p.x, p.z) : [R, R]; i ? c.lineTo(x, y) : c.moveTo(x, y); });
       c.stroke();
       c.restore();
     }
-    const dot = (x, z, color, r) => { const [sx, sy] = to(x, z); c.fillStyle = color; c.fillRect(sx - r * u, sy - r * u, r * 2 * u, r * 2 * u); };
-    const text = (ch, sx, sy, color, size) => {
-      c.font = `${Math.round(size * u)}px VT323, monospace`;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.lineWidth = 3 * u;
-      c.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-      c.strokeText(ch, sx, sy);
-      c.fillStyle = color;
-      c.fillText(ch, sx, sy);
-    };
-    const inside = (sx, sy, pad = 8) => Math.hypot(sx - R, sy - R) < R - pad * u;
-    // on the map only (shrines, merchant) or pinned to the rim when out of range (coffins, castle)
-    const icon = (x, z, ch, color, size = 14, pin = true) => {
-      let [sx, sy] = to(x, z);
-      const d = Math.hypot(sx - R, sy - R) || 1, rim = R - 9 * u;
-      if (d > rim) { if (!pin) return; sx = R + ((sx - R) / d) * rim; sy = R + ((sy - R) / d) * rim; }
-      text(ch, sx, sy, color, size);
-    };
-    for (const { l } of world.visibleLights) dot(l.x, l.z, '#ffd070', 1.5);
-    for (const o of enemies.orbs) dot(o.mesh.position.x, o.mesh.position.z, '#80f0ff', 1.5);
-    for (const e of enemies.list) if (!e.dying) dot(e.pos.x, e.pos.z, DOT[e.type], e.T.boss ? 4 : 2.5);
-    for (const s of world.shrines || []) icon(s.x, s.z, '†', '#ffd080', 15, false);
-    if (world.merchantSpot) icon(world.merchantSpot.x, world.merchantSpot.z, '¤', '#90f0ff', 15, false);
-    for (const cf of world.coffins) if (!cf.destroyed && cf !== target) icon(cf.x, cf.z, '✝', '#a03040', 13);
-    icon(CASTLE.x, CASTLE.z, '♜', world.gate.open ? '#ffd040' : '#c02040', 15);
-    // the objective: a pulsing diamond on the map, or an arrow on the rim with the distance
+    // shrines (faded once used tonight), the merchant, the coffins still standing
+    for (const sh of shrines || world.shrines || []) {
+      const [sx, sy] = to(sh.x, sh.z);
+      if (inside(sx, sy, 8)) text('†', sx, sy, sh.used === night ? 'rgba(120, 100, 70, 0.6)' : '#9a6400', 20);
+    }
+    if (world.merchantSpot) {
+      const [sx, sy] = to(world.merchantSpot.x, world.merchantSpot.z + 6);
+      if (inside(sx, sy, 8)) text('¤', sx, sy, '#0e6a72', 20);
+    }
+    for (const cf of world.coffins) {
+      if (cf.destroyed || cf === target) continue;
+      const [sx, sy] = to(cf.x, cf.z);
+      if (inside(sx, sy, 8)) text('✝', sx, sy, '#5a2020', 17);
+    }
+    // creatures: red dots (bigger for elites, bigger still for a boss)
+    for (const e of enemies.list) {
+      if (e.dying) continue;
+      const [sx, sy] = to(e.pos.x, e.pos.z);
+      if (!inside(sx, sy, 3)) continue;
+      const r = (e.T.boss ? 6 + pulse : e.elite ? 4.5 : 3.5) * u;
+      c.fillStyle = e.T.boss ? '#ff1020' : '#d01828';
+      c.strokeStyle = '#1a0606';
+      c.lineWidth = 1.4 * u;
+      c.beginPath(); c.arc(sx, sy, r, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    // the objective: a pulsing red diamond on the map, or an arrow on the rim with the distance
     if (target) {
-      const pulse = 0.6 + 0.4 * Math.sin(now / 180), [tx, ty] = to(target.x, target.z);
-      if (inside(tx, ty, 10)) text('◆', tx, ty, `rgba(255, 220, 90, ${pulse})`, 20);
-      else {
-        const a = Math.atan2(ty - R, tx - R), rim = R - 3 * u;
+      const [tx, ty] = to(target.x, target.z);
+      if (inside(tx, ty, 12)) {
+        c.strokeStyle = `rgba(176, 16, 26, ${0.5 + 0.45 * pulse})`;
+        c.lineWidth = 2.4 * u;
+        c.beginPath(); c.arc(tx, ty, (10 + 3 * pulse) * u, 0, Math.PI * 2); c.stroke();
+        text('◆', tx, ty, '#c0101c', 22);
+      } else {
+        const ang = Math.atan2(ty - R, tx - R), rim = R - 2 * u;
         c.save();
-        c.translate(R + Math.cos(a) * rim, R + Math.sin(a) * rim);
-        c.rotate(a);
-        c.fillStyle = `rgba(255, 216, 96, ${0.75 + 0.25 * pulse})`;
-        c.strokeStyle = '#000';
-        c.lineWidth = 1.5 * u;
-        c.beginPath(); c.moveTo(1 * u, 0); c.lineTo(-11 * u, -8 * u); c.lineTo(-11 * u, 8 * u); c.closePath();
+        c.translate(R + Math.cos(ang) * rim, R + Math.sin(ang) * rim);
+        c.rotate(ang);
+        c.fillStyle = '#c0101c';
+        c.strokeStyle = '#f4ead0';
+        c.lineWidth = 2 * u;
+        c.beginPath(); c.moveTo(0, 0); c.lineTo(-14 * u, -9 * u); c.lineTo(-10 * u, 0); c.lineTo(-14 * u, 9 * u); c.closePath();
         c.stroke(); c.fill();
         c.restore();
-        const dist = Math.hypot(target.x - px, target.z - pz), lr = R - 24 * u;
-        text(`${Math.round(dist)}m`, R + Math.cos(a) * lr, R + Math.sin(a) * lr, '#ffe8a0', 15);
+        const dist = `${Math.round(Math.hypot(target.x - px, target.z - pz))} m`, lr = R - 30 * u;
+        text(dist, R + Math.cos(ang) * lr, R + Math.sin(ang) * lr, '#8a0c14', 17);
       }
     }
-    // north on the rim (it moves when the map turns)
-    if (this.mapRotate) text('N', R + sr * (R - 9 * u), R - cr * (R - 9 * u), '#ff8070', 15);
-    // what the camera sees, then the hunter
+    // north: a dark chip on the rim (it travels around when the map turns)
+    c.fillStyle = 'rgba(30, 16, 8, 0.85)';
+    c.beginPath(); c.arc(nx, ny, 8.5 * u, 0, Math.PI * 2); c.fill();
+    text('N', nx, ny + 0.5 * u, '#f0d080', 15, "'Pirata One', serif", 'rgba(0, 0, 0, 0)');
+    // the hunter, as on the map screen
     c.save();
     c.translate(R, R);
-    c.rotate(rot - camYaw);
-    const view = c.createRadialGradient(0, 0, 0, 0, 0, R * 0.7);
-    view.addColorStop(0, 'rgba(255,255,255,0.18)');
-    view.addColorStop(1, 'rgba(255,255,255,0)');
-    c.fillStyle = view;
-    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R * 0.7, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); c.closePath(); c.fill();
-    c.restore();
-    c.save();
-    c.translate(R, R);
+    c.fillStyle = `rgba(30, 140, 200, ${0.2 + 0.12 * pulse})`;
+    c.beginPath(); c.arc(0, 0, 13 * u, 0, Math.PI * 2); c.fill();
     c.rotate(rot - player.facing + Math.PI);
-    c.fillStyle = '#60e8ff';
-    c.strokeStyle = '#000';
-    c.lineWidth = 1.5 * u;
-    c.beginPath(); c.moveTo(0, -7 * u); c.lineTo(5 * u, 6 * u); c.lineTo(0, 3 * u); c.lineTo(-5 * u, 6 * u); c.closePath();
+    c.fillStyle = '#0c4a78';
+    c.strokeStyle = '#f4ead0';
+    c.lineWidth = 2 * u;
+    c.beginPath(); c.moveTo(0, -10 * u); c.lineTo(7 * u, 8 * u); c.lineTo(0, 4 * u); c.lineTo(-7 * u, 8 * u); c.closePath();
     c.stroke(); c.fill();
     c.restore();
     c.restore();

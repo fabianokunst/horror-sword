@@ -658,7 +658,7 @@ function frame() {
     const label = `${campaign.tag} · ${night === 0 ? L('CREPÚSCULO', 'DUSK') : wasNight ? `${L('NOITE', 'NIGHT')} ${night}` : `${L('DIA', 'DAY')} ${night + 1}`}`;
     goal = campaign.objective();
     const mapKey = input.touch ? L('MAPA', 'MAP') : `<b>${pads.active ? '↓' : 'M'}</b> ${L('MAPA', 'MAP')}`;
-    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0, mapKey });
+    hud.update(rawDt, { player, enemies, world, time: dayT, night, label, camYaw, objective: goal.text, target: goal.target, hunter: campaign.hunter, purse: campaign.save.purse || 0, mapKey, shrines: interact.shrines });
     if (state === 'play' && campaign.save.picks > 0) openLevelUp();
     audioFrame(dt, time);
   } else {

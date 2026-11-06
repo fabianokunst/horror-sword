@@ -8,7 +8,7 @@
   --sb: env(safe-area-inset-bottom, 0px);
   /* HUD scales with the short side of the screen (values match the original layout at 1080p) */
   --pad: clamp(10px, 1.9vmin, 20px);
-  --map: clamp(84px, 13vmin, 190px);
+  --map: clamp(100px, 17vmin, 250px);
   /* touch controls */
   --big: clamp(68px, 19vmin, 100px);
   --small: clamp(46px, 12.5vmin, 66px);
